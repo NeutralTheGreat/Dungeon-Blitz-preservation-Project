@@ -157,19 +157,19 @@ PKTTYPE_UPDATE_EQUIPMENT = 0x30
 # Talent and Skill Related Packets
 #===================================
 const_1089 = 0xd2 # PKTTYPE_RESPEC_TALENT_TREE
-const_987 = 0xd6
-const_1284 = 0xe0
-const_1044 = 0xd4
-const_1220 = 0xdf
-const_1047 = 0xd3
-const_920 = 0xd5
-const_929 = 0xbd
-const_1077 = 0xbe
-const_1205 = 0xd1
-const_1129 = 0xdd
-const_1111 = 0xde
-const_966 = 0xbf
-const_1133 = 0xc0
+const_987 = 0xD6  # Client → Server: Claim a completed Master Class Tower research point (grants a new talent point)
+const_1284 = 0xE0  # Client → Server: Spend Mammoth Idols to speed up Master Class Tower talent research
+const_1044 = 0xD4  # Client → Server: Begin training a new Master Class Tower talent point (includes class index + free/paid flag)
+const_1220 = 0xDF  # Client → Server: Cancel/clear current Master Class Tower research in progress
+const_1047 = 0xD3  # Client → Server: Update Forge upgrade points
+const_920 = 0xD5  # Server → Client: Notify that Master Class Tower research has completed (talent point ready to claim)
+const_929 = 0xBD  # Client → Server: Update hotbar skill assignments (which abilities are equipped in each slot)
+const_1077 = 0xBE  # Client → Server: Begin training a new skill rank in the Ability Book/Tome (abilityID, newRank, free/paid flag)
+const_1205 = 0xD1  # Client → Server: Claim a completed Ability Book/Tome skill research (grants new rank in learnedAbilities)
+const_1129 = 0xDD # Client → Server : Cancel the current ongoing skill research
+const_1111 = 0xde # Client → Server : Speed up the current Skill Research
+const_966 = 0xbf  # Server → Client : tells the client that the skills research has completed and is ready to claim
+const_1133 = 0xc0 # Client → server : tells the server the player has allocated new points in the talent tree
 #===================================
 
 # Forge Related Packets
@@ -185,19 +185,20 @@ const_1105 = 0xcf  # PKTTYPE_MAGIC_FORGE_REROLL - Client requests the server to 
 
 # Gear Set Related Packets
 #===================================
-const_976 = 0xc8
-const_843 = 0xc7
-const_893 = 0xc6
+const_976 = 0xc8 # Client → server : tells the server if a gearset has been renamed
+const_843 = 0xc7 # Client → server : tells the server when a new gearset is created
+const_893 = 0xc6 # Client → server : tells the server when the player has equipped a gearset
 #===================================
 
 # Buildings Upgrade Packets
 #===================================
-const_1032 = 0xdb
-const_1187 = 0xdc
-const_861 = 0xd7
-const_838 = 0xd8
-const_1027 = 0xe3
-const_878 = 0xd9
+const_1032 = 0xdb # Client → server : cancel the current ongoing upgrading building
+const_1187 = 0xdc # Client → server : Building upgrade speed up request
+const_861 = 0xd7 # Client → server : client notifies the server when the player has started an upgrade
+const_838 = 0xd8 # Server → Client : server notifies the client when a building has finished upgrading
+const_1027 = 0xe3 # Server → Client : the actual purpose of this packet is unknown what it does is  if the client receives this packet the client will refresh the home buildings like Forge,Tome,etc..
+const_878 = 0xd9 # Client → server : client acknowledged a completed building upgrade it gets sent after 0xD8 completion has been processed
+
 #===================================
 
 # Master Class Related Packets

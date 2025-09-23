@@ -1,6 +1,9 @@
 import json
 from typing import Optional, Dict
+"""
+ if a missions has "Achievement": "True", it means that this missions is a special mission 
 
+"""
 # cache
 _MISSION_DEFS_BY_ID: Optional[Dict[int, dict]] = None
 _MISSION_EXTRA_BY_ID: Optional[Dict[int, dict]] = None
