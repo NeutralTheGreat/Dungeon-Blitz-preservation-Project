@@ -844,7 +844,7 @@ def handle_client(session: ClientSession):
             elif pkt == 0xB0:# Done
                 handle_rune_packet(session, data) # equips runes on weapon slots
             elif pkt == 0x31:# Done
-                handle_gear_packet(session, data, all_sessions)
+                handle_gear_packet(session, data)
             elif pkt == 0x30:# Done
                 handle_update_equipment(session, data)
             ############################################
