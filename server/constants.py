@@ -318,13 +318,12 @@ BUILDING_ID_TO_STATS_INDEX = {
     13: 6,   # Hatcher
 }
 
-
 NEWS_EVENTS = {
-    1: ["a_NewsGoldIcon",      "Double Gold Event",     "While this event is in place all gold will be doubled world wide",       "http://www.dungeonblitz.com/", 1786841238],
-    2: ["a_NewsGearIcon",      "Double Gear Event",     "While this event is in place all gear drops will be doubled world wide",  "http://www.dungeonblitz.com/", 1786841238],
-    3: ["a_NewsMatsIcon",      "Double Material Event", "While this event is in place all material drops will be doubled world wide","http://www.dungeonblitz.com/",1786841238],
-    4: ["a_NewsXPIcon",        "Double XP Event",       "While this event is in place all XP gained will be doubled world wide",     "http://www.dungeonblitz.com/",1786841238],
-    5: ["a_NewsPetXPIcon",     "Double Pet XP Event",   "While this event is in place all pet XP gained will be doubled world wide", "http://www.dungeonblitz.com/",1786841238],
+    1: ["a_NewsGoldIcon",      "Double Gold Event",     "Double Gold Event",       "http://www.dungeonblitz.com/",1786841238],
+    2: ["a_NewsGearIcon",      "Double Gear Event",     "Double Gear Event",       "http://www.dungeonblitz.com/",1786841238],
+    3: ["a_NewsMatsIcon",      "Double Material Event", "Double Material Event",   "http://www.dungeonblitz.com/",1786841238],
+    4: ["a_NewsXPIcon",        "Double XP Event",       "Double XP Event",         "http://www.dungeonblitz.com/",1786841238],
+    5: ["a_NewsPetXPIcon",     "Double Pet XP Event",   "Double Pet XP Event",     "http://www.dungeonblitz.com/",1786841238],
 }
                #Loaders
 ################################################################

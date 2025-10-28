@@ -418,7 +418,7 @@ def Player_Data_Packet(char: dict,
 
 
         # ──────────────(Skill Research)──────────────
-        research = char.get("research")
+        research = char.get("SkillResearch")
         if research:
             buf.write_method_11(1, 1)
             buf.write_method_6(research["abilityID"], class_10_const_83)
@@ -520,7 +520,7 @@ def Player_Data_Packet(char: dict,
 
     # This is where the extended data branch stops
     else:
-        print("[DEBUG] Skipping extended data block")
+        #print("[DEBUG] Skipping extended data block")
         buf.write_method_6(0, 1)
 
 

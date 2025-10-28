@@ -1,14 +1,17 @@
-
+import copy
+import hashlib
 import json, struct
-import math
+import os
 import pprint
 import random
 import secrets
 import time
 
 import missions
-from Character import save_characters, build_paperdoll_packet
-from accounts import build_popup_packet
+from Character import save_characters, build_paperdoll_packet, load_characters, get_inventory_gears, \
+    build_level_gears_packet, build_login_character_list_bitpacked, load_class_template
+from WorldEnter import build_enter_world_packet, Player_Data_Packet
+from accounts import build_popup_packet, is_character_name_taken, _SAVES_DIR, load_accounts, get_or_create_user_id
 from bitreader import BitReader
 from constants import GearType, EntType, class_64, class_1, DyeType, class_118, method_277, \
     class_111, class_1_const_254, class_8, class_3, \
@@ -16,13 +19,648 @@ from constants import GearType, EntType, class_64, class_1, DyeType, class_118, 
     index_to_node_id, door, class_119
 from BitBuffer import BitBuffer
 from constants import get_dye_color
-from entity import Send_Entity_Data
-from level_config import SPAWN_POINTS, DOOR_MAP, LEVEL_CONFIG
+from entity import Send_Entity_Data, load_npc_data_for_level
+from globals import level_npcs, pending_world, used_tokens, session_by_token, extended_sent_map, current_characters, \
+    _level_add, SECRET
+from level_config import SPAWN_POINTS, DOOR_MAP, LEVEL_CONFIG, get_spawn_coordinates, resolve_special_mission_doors
 from scheduler import scheduler, _on_research_done_for, schedule_building_upgrade, _on_building_done_for, \
     schedule_forge, _on_talent_done_for, schedule_Talent_point_research
 from missions import _MISSION_DEFS_BY_ID
 
 SAVE_PATH_TEMPLATE = "saves/{user_id}.json"
+
+# Helpers
+#############################################
+
+# updates players consumables inventory when a  consumable is used
+def send_consumable_update(conn, consumable_id: int, new_count: int):
+    bb = BitBuffer()
+    bb.write_method_6(consumable_id, class_3.const_69)
+    bb.write_method_4(new_count)
+    body = bb.to_bytes()
+    packet = struct.pack(">HH", 0x10C, len(body)) + body
+    conn.sendall(packet)
+
+def build_start_skit_packet(entity_id: int, dialogue_id: int = 0, mission_id: int = 0) -> bytes:
+    """
+    Build packet for client to start a skit/dialogue.
+    entity_id: The NPC's entity ID.
+    dialogue_id: Which dialogue to show (0–5).
+    mission_id: Currently unused, but protocol reserves it.
+    dialogue ID should always be 0 for NPCs with no linked missions
+    """
+    bb = BitBuffer()
+    bb.write_method_4(entity_id)        # Entity ID
+    bb.write_method_6(dialogue_id, 3)   # Dialogue ID (3 bits)
+    bb.write_method_4(mission_id)       # Mission ID (reserved / unused for now)
+    payload = bb.to_bytes()
+    return struct.pack(">HH", 0x7B, len(payload)) + payload
+
+def send_npc_dialog(session, npc_id, text):
+    bb = BitBuffer()
+    bb.write_method_4(npc_id)
+    bb.write_method_13(text)
+    payload = bb.to_bytes()
+    packet = struct.pack(">HH", 0x76, len(payload)) + payload
+    session.conn.sendall(packet)
+    print(f"[DEBUG] Sent NPC dialog: {text}")
+
+# this is required for every time MamothIdols Are used to make a purchase to update the current amount of Idols in the client
+def send_premium_purchase(session, item_name: str, cost: int):
+    bb = BitBuffer()
+    bb.write_method_13(item_name)  # matches param1.method_13() in client
+    bb.write_method_4(cost)        # matches param1.method_4() in client
+    body = bb.to_bytes()
+    packet = struct.pack(">HH", 0xB5, len(body)) + body
+    session.conn.sendall(packet)
+    print(f"[DEBUG] Deducted {cost} Mammoth Idols for {item_name}")
+
+def _send_error(conn, msg):
+    encoded = msg.encode("utf-8")
+    payload = struct.pack(">H", len(encoded)) + encoded
+    conn.sendall(struct.pack(">HH", 0x44, len(payload)) + payload)
+
+#############################################
+
+
+def handle_login_version(session, data, conn):
+    """
+    Handle PKTTYPE_LOGIN_VERSION (0x11) — client sends game version.
+    Respond with PKTTYPE_LOGIN_CHALLENGE (0x12) challenge string.
+    """
+    payload = data[4:]
+    try:
+        br = BitReader(data)
+        client_version = br.read_method_9()  # client sends one integer
+    except Exception as e:
+        print(f"[{session.addr}] [0x11] Failed to parse login version: {e}, raw={data.hex()}")
+        return
+
+    # (Optional) version check
+    if client_version != 100:
+        print(f"[{session.addr}] ⚠️ Unsupported client version: {client_version}")
+
+    # 1) Generate random 16-bit session id
+    sid = secrets.randbelow(1 << 16)
+    sid_bytes = sid.to_bytes(2, "big")
+
+    # 2) Compute MD5(sid || SECRET)
+    digest = hashlib.md5(sid_bytes + SECRET).hexdigest()[:12]
+
+    # 3) Build hex challenge string: "sid_hex + digest"
+    sid_hex = f"{sid:04x}"
+    challenge_str = sid_hex + digest  # 16 hex characters
+
+    # 4) UTF-8 encode with 2-byte length prefix
+    utf_bytes = challenge_str.encode("utf-8")
+    payload = struct.pack(">H", len(utf_bytes)) + utf_bytes
+
+    # 5) Prepend packet header (0x12)
+    response = struct.pack(">HH", 0x12, len(payload)) + payload
+
+    # 6) Send to client
+    conn.sendall(response)
+    print(f"[{session.addr}] → Sent 0x12 login challenge sid={sid_hex} hash={digest}")
+
+def handle_login_create(session, data, conn):
+    """
+    Handle PKTTYPE_LOGIN_CREATE (0x13)
+    Client sends platform IDs + email + password + legacy key.
+    Server responds with PKTTYPE_LOGIN_CHARACTER_LIST (0x15).
+    """
+    payload = data[4:]
+    try:
+        br = BitReader(data)
+        client_facebook_id = br.read_method_26()
+        client_kongregate_id = br.read_method_26()
+        email = br.read_method_26().strip().lower()
+        password = br.read_method_26()
+        legacy_auth_key = br.read_method_26()
+    except Exception as e:
+        print(f"[{session.addr}] [0x13] Failed to parse login-create: {e}, raw={data.hex()}")
+        return
+
+    # Account lookup or creation
+    session.user_id = get_or_create_user_id(email)
+    session.authenticated = True
+
+    # Load this user's character list
+    session.char_list = load_characters(session.user_id)
+
+    # Build and send 0x15 character list packet
+    packet = build_login_character_list_bitpacked(session.char_list)
+    conn.sendall(packet)
+
+    print(f"[{session.addr}] [0x13] Login/Create OK for {email} → {len(session.char_list)} characters")
+
+def handle_login_authenticate(session, data, conn):
+    br = BitReader(data[4:], debug=True)
+    try:
+        client_facebook_id = br.read_method_26()
+        client_kongregate_id = br.read_method_26()
+        email = br.read_method_26().strip().lower()
+        encrypted_password = br.read_method_26()
+        legacy_auth_key = br.read_method_26()
+    except Exception as e:
+        print(f"[{session.addr}] [0x14] Error parsing packet: {e}, raw={data.hex()}")
+        return
+
+    accounts = load_accounts()
+    user_id = accounts.get(email)
+    if not user_id:
+        conn.sendall(build_popup_packet("Account not found", disconnect=True))
+        print(f"[{session.addr}] [0x14] Login failed — account not found for {email}")
+        return
+
+    session.user_id = user_id
+    save_path = os.path.join(_SAVES_DIR, f"{user_id}.json")
+
+    try:
+        with open(save_path, "r", encoding="utf-8") as f:
+            session.player_data = json.load(f)
+    except FileNotFoundError:
+        print(f"[{session.addr}] [0x14] Missing save for user {user_id}, creating blank save.")
+        session.player_data = {"email": email, "characters": []}
+
+    session.char_list = session.player_data.get("characters", [])
+    session.authenticated = True
+
+    # Send character list
+    packet = build_login_character_list_bitpacked(session.char_list)
+    conn.sendall(packet)
+
+    print(f"[{session.addr}] [0x14] Login success for {email} → user_id={user_id}, {len(session.char_list)} chars")
+
+
+def handle_login_character_create(session, data, conn):
+    """
+    Handle PKTTYPE_LOGIN_CHARACTER_CREATE (0x17)
+    Client sends name, class, appearance & color data.
+    Server creates the new character, saves it, and returns updated info.
+    """
+    br = BitReader(data[4:])
+    try:
+        name = br.read_method_26()
+        class_name = br.read_method_26()
+        gender = br.read_method_26()
+        head = br.read_method_26()
+        hair = br.read_method_26()
+        mouth = br.read_method_26()
+        face = br.read_method_26()
+        hair_color = br.read_method_20(EntType.CHAR_COLOR_BITSTOSEND)
+        skin_color = br.read_method_20(EntType.CHAR_COLOR_BITSTOSEND)
+        shirt_color = br.read_method_20(EntType.CHAR_COLOR_BITSTOSEND)
+        pant_color = br.read_method_20(EntType.CHAR_COLOR_BITSTOSEND)
+    except Exception as e:
+        print(f"[{session.addr}] [0x17] Failed to parse create-char: {e}, raw={data.hex()}")
+        return
+
+    # Check for taken names
+    if is_character_name_taken(name):
+        err_packet = build_popup_packet(
+            "Character name is unavailable. Please choose a new name.",
+            disconnect=False
+        )
+        conn.sendall(err_packet)
+        print(f"[{session.addr}] [0x17] Name taken: {name}")
+        return
+
+    print(f"[{session.addr}] [0x17] Creating character '{name}' ({class_name}, {gender})")
+
+    # Load base class template and apply cosmetic choices
+    base_template = load_class_template(class_name)
+    new_char = copy.deepcopy(base_template)
+    new_char.update({
+        "name": name,
+        "class": class_name,
+        "gender": gender,
+        "headSet": head,
+        "hairSet": hair,
+        "mouthSet": mouth,
+        "faceSet": face,
+        "hairColor": hair_color,
+        "skinColor": skin_color,
+        "shirtColor": shirt_color,
+        "pantColor": pant_color,
+    })
+
+    # Save to the player's file
+    session.char_list.append(new_char)
+    save_characters(session.user_id, session.char_list)
+
+    # --- Send updated character list (0x15) ---
+    char_list_packet = build_login_character_list_bitpacked(session.char_list)
+    conn.sendall(char_list_packet)
+    print(f"[{session.addr}] [0x17] Sent 0x15 character list update ({len(session.char_list)} chars)")
+
+    # --- Send paperdoll preview (0x1A) ---
+    pd = build_paperdoll_packet(new_char)
+    conn.sendall(struct.pack(">HH", 0x1A, len(pd)) + pd)
+    print(f"[{session.addr}] [0x17] Sent 0x1A paperdoll packet, len={len(pd)}")
+
+    # --- Send popup success message (0x1B) ---
+    popup = build_popup_packet("Character Successfully Created", disconnect=False)
+    conn.sendall(popup)
+    print(f"[{session.addr}] [0x17] Sent 0x1B popup message")
+
+def handle_character_select(session, data, conn):
+    """
+    Handle PKTTYPE_LOGIN_CHARACTER_SELECT (0x16)
+    The client sends the selected character name via method_26.
+    The server responds by preparing level entry and sending the enter world packet.
+    """
+    br = BitReader(data[4:])
+    try:
+        name = br.read_method_26()
+    except Exception as e:
+        print(f"[{session.addr}] [0x16] Error reading character name: {e}, raw={data.hex()}")
+        return
+
+    for c in session.char_list:
+        if c["name"] == name:
+            session.current_character = name
+            current_level = c.get("CurrentLevel", {}).get("name", "CraftTown")
+            session.current_level = current_level
+            c["user_id"] = session.user_id
+
+            # Default previous level if missing
+            prev_name = c.get("PreviousLevel", {}).get("name", "NewbieRoad")
+
+            # Issue transfer token
+            tk = session.ensure_token(c, target_level=current_level, previous_level=prev_name)
+            session.clientEntID = tk
+            session_by_token[tk] = session
+
+            # Register in level
+            _level_add(current_level, session)
+
+            # Fetch level configuration
+            level_config = LEVEL_CONFIG.get(current_level, ("LevelsNR.swf/a_Level_NewbieRoad", 1, 1, False))
+
+            # Determine hard mode flags
+            is_hard = current_level.endswith("Hard")
+            new_moment = "Hard" if is_hard else ""
+            new_alter = "Hard" if is_hard else ""
+
+            # Build and send enter world packet
+            pkt_out = build_enter_world_packet(
+                transfer_token=tk,
+                old_level_id=0,
+                old_swf="",
+                has_old_coord=False,
+                old_x=0,
+                old_y=0,
+                host="127.0.0.1",
+                port=8080,
+                new_level_swf=level_config[0],
+                new_map_lvl=level_config[1],
+                new_base_lvl=level_config[2],
+                new_internal=current_level,
+                new_moment=new_moment,
+                new_alter=new_alter,
+                new_is_dungeon=level_config[3],
+                new_has_coord=False,
+                new_x=0,
+                new_y=0,
+                char=c,
+            )
+            conn.sendall(pkt_out)
+
+            # Track pending world transfer
+            pending_world[tk] = (c, current_level, prev_name)
+
+            # Reload + save updated characters
+            session.char_list = load_characters(session.user_id)
+            for i, char in enumerate(session.char_list):
+                if char["name"] == name:
+                    session.char_list[i] = c
+                    break
+            save_characters(session.user_id, session.char_list)
+
+            print(f"[{session.addr}] [0x16] Transfer begin: {name}, tk={tk}, level={current_level}")
+            break
+
+def handle_open_door(session, data, conn):
+    """
+    Handle PKTTYPE_OPEN_DOOR (0x2D)
+    The client requests to open a door, providing door_id (method_9).
+    The server replies with a 0x2E packet pointing to the target level.
+    """
+    br = BitReader(data[4:])
+    try:
+        door_id = br.read_method_9()
+    except Exception as e:
+        print(f"[{session.addr}] ERROR: Failed to parse 0x2D packet: {e}, raw payload={data.hex()}")
+        return
+
+    current_level = session.current_level
+    print(f"[{session.addr}] OpenDoor request: doorID={door_id}, current_level={current_level}")
+
+    is_dungeon = LEVEL_CONFIG.get(current_level, (None, None, None, False))[3]
+    target_level = DOOR_MAP.get((current_level, door_id))
+
+    # Dungeon fallback if no mapping found
+    if target_level is None and is_dungeon:
+        target_level = session.entry_level
+        if not target_level:
+            print(f"[{session.addr}] Error: No entry_level set for door {door_id} in dungeon {current_level}")
+            return
+    elif door_id == 999:
+        target_level = "CraftTown"
+
+    if target_level:
+        if target_level not in LEVEL_CONFIG:
+            print(f"[{session.addr}] Error: Target level {target_level} not found in LEVEL_CONFIG")
+            return
+
+        # Build and send DoorTarget response (0x2E)
+        bb = BitBuffer()
+        bb.write_method_4(door_id)
+        bb.write_method_13(target_level)
+        payload = bb.to_bytes()
+        resp = struct.pack(">HH", 0x2E, len(payload)) + payload
+        conn.sendall(resp)
+
+        print(f"[{session.addr}] Sent DOOR_TARGET: doorID={door_id}, level='{target_level}'")
+
+        # Reset world state for upcoming level transition
+        session.world_loaded = False
+        session.entities.clear()
+    else:
+        print(f"[{session.addr}] Error: No target for door {door_id} in level {current_level}")
+
+def handle_request_level_gears(session, data, conn):
+    payload = data
+    br = BitReader(payload[4:], debug=False)
+    try:
+        var_2744 = br.read_method_9()
+        print(f"[0xF4] Client sent var_2744={var_2744}, raw={payload.hex()}")
+
+        if session.current_character:
+            char = next((c for c in session.char_list if c["name"] == session.current_character), None)
+            if char:
+                gears_list = get_inventory_gears(char)
+                packet = build_level_gears_packet(gears_list)
+                conn.sendall(packet)
+                print(f"[0xF4] Sent 0xF5 Armory gear list ({len(gears_list)} items)")
+    except Exception as e:
+        print(f"[0xF4] Error parsing: {e}, raw={payload.hex()}")
+
+def handle_gameserver_login(session, data, conn):
+    """
+    Handle PKTTYPE_GAMESERVER_LOGIN (0x1F)
+    Sent by the client after level transfer to finalize connection and spawn entities.
+    """
+    if len(data) < 6:
+        # Optional: remove this check if you fully trust client/server sync
+        print(f"[{session.addr}] Warning: 0x1F packet smaller than expected, len={len(data)}")
+
+    token = int.from_bytes(data[4:6], 'big')
+
+    # Resolve entry (used_tokens or pending_world)
+    entry = used_tokens.get(token) or pending_world.get(token)
+
+    # If entry missing, attempt to resolve by session token (support reconnects)
+    if entry is None:
+        if len(pending_world) == 1:
+            token, entry = next(iter(pending_world.items()))
+        else:
+            s = session_by_token.get(token)
+            if s:
+                entry = (
+                    getattr(s, "current_char_dict", None)
+                    or {"name": s.current_character, "user_id": s.user_id},
+                    s.current_level,
+                )
+
+    if not entry:
+        print(f"[{session.addr}] Error: No entry found for token {token}, pending_world size={len(pending_world)}")
+        return
+
+    # entry may be (char, target_level) or (char, target_level, previous_level)
+    if len(entry) == 2:
+        char, target_level = entry
+        previous_level = session.current_level or char.get("PreviousLevel", {}).get("name", "NewbieRoad")
+    else:
+        char, target_level, previous_level = entry
+        if isinstance(previous_level, dict):
+            previous_level = previous_level.get("name", "NewbieRoad")
+
+    if char is None:
+        print(f"[{session.addr}] Error: Character is None for token {token}")
+        return
+
+    # Dungeon entry tracking
+    is_dungeon = LEVEL_CONFIG.get(target_level, (None, None, None, False))[3]
+    if is_dungeon:
+        session.entry_level = previous_level or char.get("PreviousLevel", "NewbieRoad")
+    else:
+        session.entry_level = None
+
+    # Finalize user/session data
+    session.user_id = char.get("user_id")
+    if not session.user_id:
+        print(f"[{session.addr}] Error: session.user_id is None for token {token}")
+        return
+
+    # Persist character data
+    session.char_list = load_characters(session.user_id)
+    if session.char_list:
+        for i, c in enumerate(session.char_list):
+            if c["name"] == char["name"]:
+                session.char_list[i] = char
+                break
+        else:
+            session.char_list.append(char)
+    else:
+        session.char_list = [char]
+    save_characters(session.user_id, session.char_list)
+    print(f"[{session.addr}] Saved character {char['name']}: "
+          f"CurrentLevel={char.get('CurrentLevel')}, PreviousLevel={char.get('PreviousLevel')}")
+
+    # Finalize transfer
+    pending_world.pop(token, None)
+    session.current_level = target_level
+    session.current_character = char["name"]
+    session.current_char_dict = char
+    current_characters[session.user_id] = session.current_character
+    session.authenticated = True
+
+    # Register persistent token mapping
+    used_tokens[token] = (char, target_level, session.current_level or char.get("PreviousLevel", "NewbieRoad"))
+
+    # Compute spawn coords for Player_Data_Packet
+    new_x, new_y, new_has_coord = get_spawn_coordinates(char, previous_level, target_level)
+
+    # Send Player_Data_Packet (welcome)
+    user_id = session.user_id
+    send_ext = not extended_sent_map.get(user_id, {}).get("sent", False)
+    welcome = Player_Data_Packet(
+        char,
+        transfer_token=token,
+        target_level=target_level,
+        new_x=int(round(new_x)),
+        new_y=int(round(new_y)),
+        new_has_coord=new_has_coord,
+        send_extended=send_ext,
+    )
+    extended_sent_map[user_id] = {"sent": True, "last_seen": time.time()}
+    conn.sendall(welcome)
+    session.clientEntID = token
+    print(f"[{session.addr}] Welcome: {char['name']} (token {token}) "
+          f"on level {session.current_level}, pos=({new_x},{new_y})")
+
+    # Spawn NPCs for the finalized level
+    npcs = ensure_level_npcs(session.current_level)
+    for npc in npcs.values():
+        try:
+            payload = Send_Entity_Data(npc)
+            conn.sendall(struct.pack(">HH", 0x0F, len(payload)) + payload)
+            session.entities[npc["id"]] = npc
+        except Exception as e:
+            print(f"[{session.addr}] Error sending NPC {npc['id']} to {session.current_level}: {e}")
+
+    print(f"[{session.addr}] NPCs synced for level {session.current_level}")
+
+
+def handle_level_transfer_request(session, data, conn):
+    """
+    Handle PKTTYPE_LEVEL_TRANSFER_REQUEST (0x1D)
+    Sent when the player activates a door or mission exit to change levels.
+    This function keeps the original logic intact but isolates it for clarity.
+    """
+    br = BitReader(data[4:])
+    try:
+        _old_token = br.read_method_9()
+        level_name = br.read_method_13()
+    except Exception as e:
+        print(f"[{session.addr}] ERROR: Failed to parse 0x1D packet: {e}, raw payload={data.hex()}")
+        return
+
+    # Resolve character/target from token (no pop)
+    entry = used_tokens.get(_old_token) or pending_world.get(_old_token)
+    if not entry:
+        s = session_by_token.get(_old_token)
+        if s:
+            entry = (
+                getattr(s, "current_char_dict", None)
+                or {"name": s.current_character, "user_id": s.user_id},
+                s.current_level,
+            )
+    if not entry:
+        print(f"[{session.addr}] ERROR: No character for token {_old_token}")
+        return
+
+    char, target_level = entry[:2]
+
+    # If client sent empty level_name, use the server's target
+    if not level_name:
+        level_name = target_level
+        print(f"[{session.addr}] WARNING: Empty level_name, using target_level={level_name}")
+
+    # Determine where the player came from
+    raw = char.get("CurrentLevel")
+    if isinstance(raw, dict):
+        old_level = raw.get("name", session.current_level or "NewbieRoad")
+    else:
+        old_level = raw or session.current_level or "NewbieRoad"
+
+    # Clear entity from old level for this session (visual removal)
+    if session.clientEntID in session.entities:
+        del session.entities[session.clientEntID]
+        print(f"[{session.addr}] Removed entity {session.clientEntID} from level {old_level}")
+
+    # Ensure valid user id and load chars
+    session.user_id = char.get("user_id")
+    if not session.user_id:
+        print(f"[{session.addr}] ERROR: char['user_id'] missing for {char['name']}")
+        return
+    session.char_list = load_characters(session.user_id)
+    session.current_character = char["name"]
+    session.authenticated = True
+
+    # Save previous coordinates into char
+    prev_rec = char.get("CurrentLevel", {})
+    prev_x = prev_rec.get("x", 0.0)
+    prev_y = prev_rec.get("y", 0.0)
+    char["PreviousLevel"] = {"name": old_level, "x": prev_x, "y": prev_y}
+
+    # If you have special mission door resolver, apply it BEFORE spawn coords
+    level_name = resolve_special_mission_doors(char, old_level, level_name)
+
+    # Determine spawn coords (get_spawn_coordinates may return (0,0,False))
+    new_x, new_y, new_has_coord = get_spawn_coordinates(char, old_level, level_name)
+
+    # Persist updated character
+    for i, c in enumerate(session.char_list):
+        if c["name"] == char["name"]:
+            session.char_list[i] = char
+            break
+    else:
+        session.char_list.append(char)
+    save_characters(session.user_id, session.char_list)
+    print(f"[{session.addr}] Saved character {char['name']}: "
+          f"CurrentLevel={char['CurrentLevel']}, PreviousLevel={char['PreviousLevel']}")
+
+    # Issue (or reuse) transfer token but DO NOT mark session.current_level here
+    new_token = session.ensure_token(char, target_level=level_name, previous_level=old_level)
+    pending_world[new_token] = (char, level_name, old_level)
+
+    # Build ENTER_WORLD packet safely
+    try:
+        swf_path, map_id, base_id, is_inst = LEVEL_CONFIG[level_name]
+    except KeyError:
+        print(f"[{session.addr}] ERROR: Level '{level_name}' not found in LEVEL_CONFIG")
+        return
+
+    old_swf, _, _, old_is_inst = LEVEL_CONFIG.get(old_level, ("", 0, 0, False))
+    old_has_coord = ("x" in prev_rec and "y" in prev_rec)
+    is_hard = level_name.endswith("Hard")
+    new_moment = "Hard" if is_hard else ""
+    new_alter = "Hard" if is_hard else ""
+
+    pkt_out = build_enter_world_packet(
+        transfer_token=new_token,
+        old_level_id=0,
+        old_swf=old_swf,
+        has_old_coord=old_has_coord,
+        old_x=int(round(prev_x)),
+        old_y=int(round(prev_y)),
+        host="127.0.0.1",
+        port=8080,
+        new_level_swf=swf_path,
+        new_map_lvl=map_id,
+        new_base_lvl=base_id,
+        new_internal=level_name,
+        new_moment=new_moment,
+        new_alter=new_alter,
+        new_is_dungeon=is_inst,
+        new_has_coord=new_has_coord,
+        new_x=int(round(new_x)),
+        new_y=int(round(new_y)),
+        char=char,
+    )
+    conn.sendall(pkt_out)
+    print(f"[{session.addr}] Sent ENTER_WORLD with token {new_token} "
+          f"for level {level_name}, pos=({new_x},{new_y})")
+
+def ensure_level_npcs(level_name):
+    """
+    Ensure NPCs for this level are loaded/spawned once.
+    Returns the dict of NPCs for this level.
+    """
+    if level_name not in level_npcs:
+        try:
+            npcs = load_npc_data_for_level(level_name)
+            npc_map = {}
+            for npc in npcs:
+                npc_map[npc["id"]] = npc
+            level_npcs[level_name] = npc_map
+            print(f"[LEVEL] Spawned {len(npc_map)} NPCs for {level_name}")
+        except Exception as e:
+            print(f"[LEVEL] Error loading NPCs for {level_name}: {e}")
+            level_npcs[level_name] = {}
+    return level_npcs[level_name]
 
 
 
@@ -470,7 +1108,7 @@ def handle_gear_packet(session, raw_data):
 
 
 
-def handle_rune_packet(session, raw_data):
+def handle_equip_rune(session, raw_data):
     payload = raw_data[4:]
     br = BitReader(payload)
     entity_id = br.read_method_4()
@@ -1406,7 +2044,7 @@ def Start_Skill_Research(session, data, conn):
                 _on_research_done_for(uid, cname)
         )
 
-        char["research"] = {
+        char["SkillResearch"] = {
             "abilityID": ability_id,
             "ReadyTime": ready_ts,
             "done": False,
@@ -1428,7 +2066,7 @@ def handle_research_claim(session):
         print(f"[{session.addr}] No character found to complete research")
         return
 
-    research = char.get("research")
+    research = char.get("SkillResearch")
     if not research or not research.get("done"):
         print(f"[{session.addr}] No completed research to claim")
         return
@@ -1446,7 +2084,7 @@ def handle_research_claim(session):
 
     print(f"[{session.addr}] Claimed research: abilityID={ability_id}")
 
-    char["research"] = {
+    char["SkillResearch"] = {
         "abilityID": 0,
         "ReadyTime": 0,
         "done": True
@@ -1464,7 +2102,7 @@ def Skill_Research_Cancell_Request(session):
         print(f"[{session.addr}] [0xDD] Cannot cancel research: no character found")
         return
 
-    research = char.get("research")
+    research = char.get("SkillResearch")
     if not research or research.get("done"):
         print(f"[{session.addr}] [0xDD] No active research to cancel")
         return
@@ -1481,7 +2119,7 @@ def Skill_Research_Cancell_Request(session):
             print(f"[{session.addr}] [0xDD] Failed to cancel scheduler: {e}")
 
     # Clear research state
-    char["research"] = {
+    char["SkillResearch"] = {
         "abilityID": 0,
         "ReadyTime": 0,
         "done": True
@@ -1506,7 +2144,7 @@ def Skill_SpeedUp(session, data):
         print(f"[{session.addr}] [0xDE] Cannot speed up: no character found")
         return
 
-    research = char.get("research")
+    research = char.get("SkillResearch")
     if not research or research.get("done"):
         print(f"[{session.addr}] [0xDE] No active research to speed up")
         return
@@ -1525,7 +2163,7 @@ def Skill_SpeedUp(session, data):
     mem_char = next((c for c in session.char_list if c["name"] == session.current_character), None)
     if mem_char:
         mem_char["mammothIdols"] = char["mammothIdols"]
-        mem_char["research"] = research.copy()
+        mem_char["SkillResearch"] = research.copy()
 
     # Send completion packet 0xBF
     try:
@@ -2000,56 +2638,6 @@ def handle_request_respawn(session, data, all_sessions):
     print(f"[{session.addr}] [PKT77] Respawned at {spawn_pos}, potion_used={use_potion}")
 
 
-# Helpers
-#############################################
-
-# updates players consumables inventory when a  consumable is used
-def send_consumable_update(conn, consumable_id: int, new_count: int):
-    bb = BitBuffer()
-    bb.write_method_6(consumable_id, class_3.const_69)
-    bb.write_method_4(new_count)
-    body = bb.to_bytes()
-    packet = struct.pack(">HH", 0x10C, len(body)) + body
-    conn.sendall(packet)
-
-def build_start_skit_packet(entity_id: int, dialogue_id: int = 0, mission_id: int = 0) -> bytes:
-    """
-    Build packet for client to start a skit/dialogue.
-    entity_id: The NPC's entity ID.
-    dialogue_id: Which dialogue to show (0–5).
-    mission_id: Currently unused, but protocol reserves it.
-    """
-    bb = BitBuffer()
-    bb.write_method_4(entity_id)        # Entity ID
-    bb.write_method_6(dialogue_id, 3)   # Dialogue ID (3 bits)
-    bb.write_method_4(mission_id)       # Mission ID (reserved / unused for now)
-
-    payload = bb.to_bytes()
-    return struct.pack(">HH", 0x7B, len(payload)) + payload
-
-def send_npc_dialog(session, npc_id, text):
-    bb = BitBuffer()
-    bb.write_method_4(npc_id)
-    bb.write_method_13(text)
-    payload = bb.to_bytes()
-    packet = struct.pack(">HH", 0x76, len(payload)) + payload
-    session.conn.sendall(packet)
-    print(f"[DEBUG] Sent NPC dialog: {text}")
-
-# this is required for every time MamothIdols Are used to make a purchase to update the current amount of Idols in the client
-def send_premium_purchase(session, item_name: str, cost: int):
-    bb = BitBuffer()
-    bb.write_method_13(item_name)  # matches param1.method_13() in client
-    bb.write_method_4(cost)        # matches param1.method_4() in client
-    body = bb.to_bytes()
-    packet = struct.pack(">HH", 0xB5, len(body)) + body
-    session.conn.sendall(packet)
-    print(f"[DEBUG] Deducted {cost} Mammoth Idols for {item_name}")
-
-def _send_error(conn, msg):
-    encoded = msg.encode("utf-8")
-    payload = struct.pack(">H", len(encoded)) + encoded
-    conn.sendall(struct.pack(">HH", 0x44, len(payload)) + payload)
 
 
 #handled
@@ -2801,8 +3389,8 @@ def handle_power_hit(session, data, all_sessions):
             'param6':     param6 if has_p6 else None,
             'flag':       param7,
         }
-        print(f"[{session.addr}] [PKT0A] Parsed power-hit:")
-        pprint.pprint(props, indent=4)
+        #print(f"[{session.addr}] [PKT0A] Parsed power-hit:")
+        #pprint.pprint(props, indent=4)
 
         # 9) Broadcast unchanged packet to other clients
         for other in all_sessions:
@@ -2982,7 +3570,6 @@ def send_existing_entities_to_joiner(joiner, all_sessions):
                 print(f"[JOIN] Sent player {ent_dict['name']} (eid={other.clientEntID}) → {joiner.addr}")
             except Exception as ex:
                 print(f"[JOIN] Error sending player {ent_dict['name']} to {joiner.addr}: {ex}")
-
 
 def handle_entity_full_update(session, data, all_sessions):
     """
@@ -3182,7 +3769,6 @@ def handle_entity_incremental_update(session, data, all_sessions):
         for line in br.get_debug_log():
             print(line)
 
-
 def handle_start_skit(session, data, all_sessions):
     """
     Handle packet 0xC5: Client requests to start or stop a skit for an entity.
@@ -3213,8 +3799,6 @@ def handle_start_skit(session, data, all_sessions):
         print(f"[{session.addr}] [PKT0xC5] Sent skit message from entity {entity_id}: '{text}'")
     else:
         print(f"[{session.addr}] [PKT0xC5] Skit flag is False for entity {entity_id}, message suppressed")
-
-
 
 def handle_hotbar_packet(session, raw_data):
     payload = raw_data[4:]
@@ -3257,8 +3841,6 @@ def handle_hotbar_packet(session, raw_data):
     save_characters(session.user_id, session.char_list)
     print(f"[Save] activeAbilities for {session.current_character} = {active} saved (user_id={session.user_id})")
 
-
-
 def handle_respec_talent_tree(session, data):
     """
     Handles client request 0xD2 to reset the talent tree using a Respec Stone.
@@ -3300,8 +3882,6 @@ def handle_respec_talent_tree(session, data):
 
     except Exception as e:
         print(f"[{session.addr}] [PKT_RESPEC] Error: {e}")
-
-
 
 def allocate_talent_tree_points(session, data):
     payload = data[4:]

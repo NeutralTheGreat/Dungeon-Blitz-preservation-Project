@@ -63,7 +63,7 @@ scheduler = TaskScheduler()
 def reschedule_for_session(session):
     now = int(time.time())
     for char in session.char_list:
-        research = char.get("research")
+        research = char.get("SkillResearch")
         if not research:
             continue
 
@@ -93,9 +93,9 @@ def _on_research_done_for(user_id: str, char_name: str):
     # Load persistent data
     chars = load_characters(user_id)
     char = next((c for c in chars if c.get("name") == char_name), None)
-    if not char or "research" not in char:
+    if not char or "SkillResearch" not in char:
         return
-    research = char["research"]
+    research = char["SkillResearch"]
     if research.get("done", False):
         return
     research["done"] = True
@@ -106,8 +106,8 @@ def _on_research_done_for(user_id: str, char_name: str):
         session = active_session_resolver(user_id, char_name)
         if session and session.authenticated:
             mem_char = next((c for c in session.char_list if c.get("name") == char_name), None)
-            if mem_char and "research" in mem_char:
-                mem_char["research"]["done"] = True
+            if mem_char and "SkillResearch" in mem_char:
+                mem_char["SkillResearch"]["done"] = True
             try:
                 bb = BitBuffer()
                 bb.write_method_6(research["abilityID"], 7)
@@ -312,7 +312,7 @@ def boot_scan_all_saves():
 
         for char in chars:
             # — Research (singular dict) —
-            research = char.get("research")
+            research = char.get("SkillResearch")
             if research and not research.get("done", False):
                 rt = research.get("ReadyTime", 0)
                 if rt <= now:

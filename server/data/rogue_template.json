@@ -8862,7 +8862,7 @@
         "var_2316": 0,
         "var_2434": false
       },
-      "research": {
+      "SkillResearch": {
         "abilityID": 0,
         "ReadyTime": 0,
         "done": true
