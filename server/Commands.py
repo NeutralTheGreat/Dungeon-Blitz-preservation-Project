@@ -115,7 +115,7 @@ def handle_login_create(session, data, conn):
     """
     payload = data[4:]
     try:
-        br = BitReader(data)
+        br = BitReader(payload, debug=True)
         client_facebook_id = br.read_method_26()
         client_kongregate_id = br.read_method_26()
         email = br.read_method_26().strip().lower()
@@ -124,7 +124,7 @@ def handle_login_create(session, data, conn):
     except Exception as e:
         print(f"[{session.addr}] [0x13] Failed to parse login-create: {e}, raw={data.hex()}")
         return
-
+    # create / lookup account and return character list
     session.user_id = get_or_create_user_id(email)
     session.authenticated = True
     session.char_list = load_characters(session.user_id)
