@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import socket, sys, time, secrets, threading
-from Brain import tick_npc_brains
 from Commands import handle_hotbar_packet, handle_masterclass_packet, handle_gear_packet, \
     handle_apply_dyes, handle_equip_rune, handle_change_look, handle_create_gearset, handle_name_gearset, \
     handle_apply_gearset, handle_update_equipment, magic_forge_packet, collect_forge_charm, start_forge_packet, \
@@ -16,7 +15,7 @@ from Commands import handle_hotbar_packet, handle_masterclass_packet, handle_gea
     handle_emote_begin, Client_Crash_Reports, handle_mount_equip_packet, handle_pet_info_packet, \
     handle_collect_hatched_egg, handle_talk_to_npc, handle_char_regen, allocate_talent_tree_points, \
     handle_respec_talent_tree, handle_building_claim, handle_login_version, handle_login_create, \
-    handle_login_authenticate, handle_character_select, handle_gameserver_login, handle_request_level_gears, \
+    handle_login_authenticate, handle_character_select, handle_gameserver_login, handle_request_armory_gears, \
     handle_level_transfer_request, handle_open_door, handle_login_character_create
 from PolicyServer import start_policy_server
 from globals import level_registry, session_by_token, all_sessions, char_tokens, token_char, extended_sent_map, HOST, \
@@ -141,9 +140,6 @@ def handle_client(session: ClientSession):
     addr = session.addr
     print("Connected:", addr)
     conn.settimeout(300)
-
-    tick_npc_brains(all_sessions)
-
     prune_extended_sent_map(timeout=2)
     buffer = bytearray()
     try:
@@ -311,7 +307,7 @@ def handle_client(session: ClientSession):
             elif pkt == 0x30:# Done
                 handle_update_equipment(session, data)
             elif pkt == 0xF4:
-                handle_request_level_gears(session, data, conn)
+                handle_request_armory_gears(session, data, conn)
             ############################################
 
             #TODO...

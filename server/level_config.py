@@ -41,7 +41,7 @@ SPECIAL_SPAWN_MAP = {
 
 def get_spawn_coordinates(char: dict, current_level: str, target_level: str) -> tuple[float, float, bool]:
     # 1. Handle special transitions first
-    if (coords := SPECIAL_SPAWN_MAP.get((current_level, target_level))):
+    if coords := SPECIAL_SPAWN_MAP.get((current_level, target_level)):
         x, y = coords
         return int(round(x)), int(round(y)), True
 
@@ -115,4 +115,4 @@ LEVEL_CONFIG = {
     for name, spec in _raw_level_config.items()
     if (p := spec.split()) and len(p) >= 4 and p[0]
 }
-print(f"[level_config] Loaded {len(LEVEL_CONFIG)} levels, {len(DOOR_MAP)} doors")
+#print(f"[level_config] Loaded {len(LEVEL_CONFIG)} levels, {len(DOOR_MAP)} doors")

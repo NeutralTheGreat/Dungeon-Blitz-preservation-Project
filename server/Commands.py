@@ -319,7 +319,7 @@ def handle_open_door(session, data, conn):
     else:
         print(f"[{session.addr}] Error: No target for door {door_id} in level {current_level}")
 
-def handle_request_level_gears(session, data, conn):
+def handle_request_armory_gears(session, data, conn):
     payload = data
     br = BitReader(payload[4:], debug=False)
     try:
