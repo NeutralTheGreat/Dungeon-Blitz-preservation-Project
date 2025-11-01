@@ -125,7 +125,7 @@ def Player_Data_Packet(char: dict,
     # do not send the extended data when the player is transferring to another level
     # because the game saves it in memory sending a second time will cause inventory items to duplicate
     if send_extended:
-        print("[DEBUG] Sending extended data block")
+        #print("[DEBUG] Sending extended data block")
         buf.write_method_6(1, 1)
 
     # ──────────────(Extended data block)──────────────
@@ -239,8 +239,10 @@ def Player_Data_Packet(char: dict,
         buf.write_method_4(char.get("DragonKeys", 0))
         buf.write_method_4(char.get("SilverSigils", 0))
 
-        # this just effects the tutorial tips value 0 will show the "Dyeing Gear available" tip although im not exactly  sure if this is working correctly
-        buf.write_method_6(8, Game.const_646)
+        # this just effects the tutorial tips value 0 will show the "Dyeing Gear available" tip although
+        # im not exactly  sure if this is working correctly
+        # we got 0-15 possible values
+        buf.write_method_6(5, Game.const_646)
 
         # ──────────────(dyes)──────────────
         owned_dyes = set(char.get("OwnedDyes", []))
