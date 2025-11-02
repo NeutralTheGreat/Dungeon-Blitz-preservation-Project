@@ -8,27 +8,19 @@ CLASS_118_CONST_127 = 6
 const_228 = 4
 GAME_CONST_209 = 4
 ENTITY_CONST_244    = 2
-Entity_const_172 = 3
 class_9_const_28 = 5
 class_1_const_254 = 7
 class_64_const_499 = 2
 class_64_const_218 = 5
 class_111_const_432 = 9
 class_10_const_665 = 4
-ENT_MAX_SLOTS = 7
 GS_BITS = 2
 MAX_CHAR_LEVEL_BITS = 6
-EntType_MAX_SLOTS = 7
-class_21_const_763 = 250
 class_10_const_83  = 7
-class_66_const_409 = 6
 class_16_const_167 = 6
 class_7_const_19 = 7
 class_9_const_129 = 5
-class_66_const_571 = 2
-class_7_const_75 = 6
 GEARTYPE_BITS = 11
-Entity_const_172_bits = 3
 SLOT_BIT_WIDTHS = []
 
 FRAMEBITS_TO_CLASSKEY = {
@@ -201,6 +193,8 @@ class PowerType :
     const_423 = 7
 
 class LinkUpdater:
+    MIN_TIME_BETWEEN_UPDATES = 125
+    MIN_TIME_BETWEEN_POS_UPDATES = 1000
     VELOCITY_DEFLATE = 10000
     VELOCITY_INFLATE = 10000
 
