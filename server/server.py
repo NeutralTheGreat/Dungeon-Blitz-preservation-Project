@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import socket, sys, time, secrets, threading
+
+from Character import save_characters
 from Commands import handle_hotbar_packet, handle_masterclass_packet, handle_gear_packet, \
     handle_apply_dyes, handle_equip_rune, handle_change_look, handle_create_gearset, handle_name_gearset, \
     handle_apply_gearset, handle_update_equipment, magic_forge_packet, collect_forge_charm, start_forge_packet, \
@@ -74,7 +76,7 @@ class ClientSession:
 
     def stop(self):
         self.running = False
-        self.cleanup()
+        self.close_connection()
 
     def get_entity(self, entity_id):
         """
@@ -100,14 +102,35 @@ class ClientSession:
         session_by_token[tk] = self
         return tk
 
-    def cleanup(self):
-        try: self.conn.close()
-        except: pass
+    def close_connection(self):
+        try:
+            self.conn.close()
+        except:
+            pass
+
+        try:
+            if self.user_id and self.char_list and self.current_character:
+                for char in self.char_list:
+                    if char.get("name") == self.current_character:
+                        # save last known position and level from memory
+                        current_level = getattr(self, "current_level", None)
+                        ent = self.entities.get(self.clientEntID, {})
+                        if current_level and ent:
+                            char["CurrentLevel"] = {
+                                "name": current_level,
+                                "x": ent.get("pos_x", 0),
+                                "y": ent.get("pos_y", 0),
+                            }
+                        break
+                save_characters(self.user_id, self.char_list)
+                print(f"[{self.addr}] Saved character {self.current_character}: "f"{char.get('CurrentLevel', {})}")
+                      
+        except Exception as e:
+            print(f"[{self.addr}] Error saving on disconnect: {e}")
 
         s = session_by_token.get(self.clientEntID)
         if s:
-            s.running = False  # session is disconnected
-            # Keep mapping for token fallback
+            s.running = False
 
         if self.current_level:
             _level_remove(self.current_level, self)
@@ -117,6 +140,7 @@ class ClientSession:
 
         if self.user_id in extended_sent_map:
             extended_sent_map[self.user_id]["last_seen"] = time.time()
+
 
 def prune_extended_sent_map(timeout: int = 2):
     """Remove users from extended_sent_map if they haven't reconnected in 'timeout' seconds."""

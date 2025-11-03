@@ -21,11 +21,13 @@ from BitBuffer import BitBuffer
 from constants import get_dye_color
 from entity import Send_Entity_Data, load_npc_data_for_level
 from globals import level_npcs, pending_world, used_tokens, session_by_token, extended_sent_map, current_characters, \
-    _level_add, SECRET, build_start_skit_packet, send_premium_purchase, send_consumable_update, _send_error
+    _level_add, SECRET, build_start_skit_packet, send_premium_purchase, send_consumable_update, _send_error, \
+    level_players
 from level_config import DOOR_MAP, LEVEL_CONFIG, get_spawn_coordinates, resolve_special_mission_doors
 from scheduler import scheduler, _on_research_done_for, schedule_building_upgrade, _on_building_done_for, \
     schedule_forge, _on_talent_done_for, schedule_Talent_point_research
 from missions import _MISSION_DEFS_BY_ID
+from ai_logic import run_ai_loop, ensure_ai_loop, AI_ENABLED
 
 SAVE_PATH_TEMPLATE = "saves/{user_id}.json"
 
@@ -402,7 +404,6 @@ def handle_gameserver_login(session, data, conn):
     print(f"[{session.addr}] Saved character {char['name']}: "
           f"CurrentLevel={char.get('CurrentLevel')}, PreviousLevel={char.get('PreviousLevel')}")
 
-    # Finalize transfer
     pending_world.pop(token, None)
     session.current_level = target_level
     session.current_character = char["name"]
@@ -431,11 +432,14 @@ def handle_gameserver_login(session, data, conn):
     extended_sent_map[user_id] = {"sent": True, "last_seen": time.time()}
     conn.sendall(welcome)
     session.clientEntID = token
-    print(f"[{session.addr}] Welcome: {char['name']} (token {token}) "
-          f"on level {session.current_level}, pos=({new_x},{new_y})")
-
-    # Spawn NPCs for the finalized level
+    print(f"[{session.addr}] Welcome: {char['name']} (token {token})")
     npcs = ensure_level_npcs(session.current_level)
+
+    if AI_ENABLED:
+        ensure_ai_loop(session.current_level, run_ai_loop)
+    else:
+        print(f"[AI] Skipping loop for level {session.current_level} (AI disabled)")
+
     for npc in npcs.values():
         try:
             payload = Send_Entity_Data(npc)
@@ -445,7 +449,6 @@ def handle_gameserver_login(session, data, conn):
             print(f"[{session.addr}] Error sending NPC {npc['id']} to {session.current_level}: {e}")
 
     print(f"[{session.addr}] NPCs synced for level {session.current_level}")
-
 
 
 def handle_level_transfer_request(session, data, conn):
@@ -3595,24 +3598,19 @@ def handle_entity_full_update(session, data, all_sessions):
 
 def handle_entity_incremental_update(session, data, all_sessions):
     payload = data[4:]
-    br = BitReader(payload, debug=True)
+    br = BitReader(payload)
 
     try:
-        # 1) Read caster/entity ID
         entity_id = br.read_method_4()
-
         is_self = (entity_id == session.clientEntID)
         if not is_self and entity_id not in session.entities:
             print(f"[{session.addr}] [PKT07] Unknown entity {entity_id} movement dropped")
             return
 
-        # 2) Read deltas
         delta_x = br.read_method_45()
         delta_y = br.read_method_45()
         delta_vx = br.read_method_45()
 
-        #print(f"delta_x:{delta_x} delta_y : {delta_y} : delta_vx : {delta_vx} ")
-        # 3) Read state & flags
         STATE_BITS = Entity.const_316
         ent_state = br.read_method_6(STATE_BITS)
         flags = {
@@ -3623,47 +3621,41 @@ def handle_entity_incremental_update(session, data, all_sessions):
             'b_backpedal': bool(br.read_method_15()),
         }
 
-        # 4) Airborne check
         is_airborne = bool(br.read_method_15())
         velocity_y = br.read_method_24() if is_airborne else 0
 
-        # ────────────────────────────────────────────────────────────
-        # ← NEW: always use last-full-update coords if available
         ent = session.entities.get(entity_id, {})
-        old_x = ent.get('pos_x')
-        old_y = ent.get('pos_y')
+        old_x = ent.get('pos_x', 0)
+        old_y = ent.get('pos_y', 0)
 
-        # Determine spawn/origin based on memory and level type
-        current_level = session.current_level
-        lvl_cfg = LEVEL_CONFIG.get(current_level, (None,) * 4)
-        is_dungeon = lvl_cfg[3]
-
-        # ────────────────────────────────────────────────────────────
-
-        # 5) Compute new absolute position
         new_x = old_x + delta_x
         new_y = old_y + delta_y
 
-        # 6) Update server-side map
         ent.update({
-            'pos_x':      new_x,
-            'pos_y':      new_y,
+            'pos_x': new_x,
+            'pos_y': new_y,
             'velocity_x': ent.get('velocity_x', 0) + delta_vx,
-            'velocity_y':  velocity_y,
-            'ent_state':   ent_state,
+            'velocity_y': velocity_y,
+            'ent_state': ent_state,
             **flags
         })
         session.entities[entity_id] = ent
 
-        # 7) Persist file only when non-dungeon and truly moving
-        if ent.get('is_player') and not is_dungeon:
+        if is_self:
+            players = level_players.setdefault(session.current_level, [])
+            players[:] = [p for p in players if p["id"] != entity_id]
+            players.append({"id": entity_id, "pos_x": new_x, "pos_y": new_y, "session": session})
+
+        if ent.get('is_player'):
             for char in session.char_list:
                 if char['name'] == session.current_character:
-                    char['CurrentLevel'] = {'name': session.current_level, 'x': new_x, 'y': new_y}
-                    save_characters(session.user_id, session.char_list)
+                    char['CurrentLevel'] = {
+                        'name': session.current_level,
+                        'x': new_x,
+                        'y': new_y
+                    }
                     break
 
-        #print(f"[{session.addr}] [PKT07] | Entity_ID:{entity_id} | Moved to =({new_x},{new_y}), state={ent_state}")
         for other in all_sessions:
             if other is not session and other.world_loaded and other.current_level == session.current_level:
                 other.conn.sendall(data)
