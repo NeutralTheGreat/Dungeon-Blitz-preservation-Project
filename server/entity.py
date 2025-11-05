@@ -93,7 +93,7 @@ entState :
 """
 
 def load_npc_data_for_level(level_name: str) -> list:
-    json_path = os.path.join("NPC_Data", f"{level_name}.json")
+    json_path = os.path.join("world_npcs", f"{level_name}.json")
     try:
         with open(json_path, 'r') as file:
             return json.load(file)

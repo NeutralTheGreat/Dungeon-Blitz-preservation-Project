@@ -176,7 +176,7 @@ select {
 <button onclick="spawnNpc()">Spawn NPC</button>
 <button onclick="stopNpcLoop()" id="stop_npc_btn" style="display:none">Stop NPC Loop</button>
 <button onclick="saveNpcToJson()">Save NPC to JSON</button>
-        <label>JSON Path:</label> <input type="text" id="json_path" size="40" placeholder="e.g., NPC_Data/my_npcs.json">
+        <label>JSON Path:</label> <input type="text" id="json_path" size="40" placeholder="e.g., world_npcs/my_npcs.json">
         <input type="file" id="json_file_picker" style="display:none" accept=".json">
         <button onclick="$('#json_file_picker').click()">Pick File</button>
         <p id="npc_status"></p>
@@ -386,7 +386,7 @@ select {
         }
         $('#json_file_picker').on('change', function() {
         const filePath = this.value.split(/[\\\/]/).pop(); // Get filename only
-        $('#json_path').val('NPC_Data/' + filePath); // Prepend server-side folder
+        $('#json_path').val('world_npcs/' + filePath); // Prepend server-side folder
         });
 
  function stopPacketLoop() {
