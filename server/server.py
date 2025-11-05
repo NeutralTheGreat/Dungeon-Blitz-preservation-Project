@@ -4,8 +4,7 @@ import socket, sys, time, secrets, threading
 from Character import save_characters
 from Commands import handle_hotbar_packet, handle_masterclass_packet, handle_gear_packet, \
     handle_apply_dyes, handle_equip_rune, handle_change_look, handle_create_gearset, handle_name_gearset, \
-    handle_apply_gearset, handle_update_equipment, magic_forge_packet, collect_forge_charm, start_forge_packet, \
-    cancel_forge_packet, allocate_talent_points, use_forge_xp_consumable, handle_private_message, \
+    handle_apply_gearset, handle_update_equipment, handle_private_message, \
     handle_public_chat, handle_group_invite, handle_power_cast, handle_power_hit, \
     handle_projectile_explode, handle_add_buff, handle_remove_buff, handle_entity_full_update, \
     handle_entity_incremental_update, handle_request_door_state, Start_Skill_Research, \
@@ -19,6 +18,8 @@ from Commands import handle_hotbar_packet, handle_masterclass_packet, handle_gea
     handle_respec_talent_tree, handle_building_claim, handle_login_version, handle_login_create, \
     handle_login_authenticate, handle_character_select, handle_gameserver_login, handle_request_armory_gears, \
     handle_level_transfer_request, handle_open_door, handle_login_character_create
+from Forge import magic_forge_packet, start_forge_packet, collect_forge_charm, cancel_forge_packet, \
+    use_forge_xp_consumable, allocate_talent_points
 from PolicyServer import start_policy_server
 from globals import level_registry, session_by_token, all_sessions, char_tokens, token_char, extended_sent_map, HOST, \
     PORTS

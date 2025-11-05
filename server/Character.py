@@ -98,7 +98,9 @@ DEFAULT_GEAR = {
         [0, 0, 0, 0, 0, 0],  # Boots
     ],
 }
+
 CHAR_SAVE_DIR = "saves"
+SAVE_PATH_TEMPLATE = "saves/{user_id}.json"
 
 def load_characters(user_id: str) -> list[dict]:
     """Load the list of characters for a given user_id."""
