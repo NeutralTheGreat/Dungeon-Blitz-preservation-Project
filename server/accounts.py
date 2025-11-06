@@ -2,9 +2,9 @@ import os
 import json
 import struct
 import tempfile
+import uuid
 
 from threading import Lock
-from uuid import uuid4
 from BitBuffer import BitBuffer
 
 _ACCOUNTS_PATH = "Accounts.json"
@@ -47,26 +47,24 @@ def save_accounts_index(index: dict[str, str]) -> None:
         _atomic_write(_ACCOUNTS_PATH, entries)
 
 def get_or_create_user_id(email: str) -> str:
-    """
-    Lookup an existing user_id by email, or create a new one if missing.
-    Always lowercases the email for consistency.
-    """
     email = email.strip().lower()
     accounts = load_accounts()
 
+    # Return existing if present
     if email in accounts:
         return accounts[email]
 
-    # New registration
-    user_id = uuid4().hex[:12]
+    # Generate a proper UUID4 with hyphens
+    user_id = str(uuid.uuid4())
+
+    # Register and persist
     accounts[email] = user_id
     save_accounts_index(accounts)
 
-    # Initialize an empty save file
+    # Initialize a new save file in the new format
     os.makedirs(_SAVES_DIR, exist_ok=True)
     save_path = os.path.join(_SAVES_DIR, f"{user_id}.json")
-    _atomic_write(save_path, {"email": email, "characters": []})
-
+    _atomic_write(save_path, {"user_id": user_id, "characters": []})
     return user_id
 
 def is_character_name_taken(name: str) -> bool:

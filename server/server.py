@@ -10,17 +10,15 @@ from Commands import handle_hotbar_packet, handle_masterclass_packet, handle_gea
     handle_apply_dyes, handle_equip_rune, handle_change_look, handle_create_gearset, handle_name_gearset, \
     handle_apply_gearset, handle_update_equipment, handle_private_message, \
     handle_public_chat, handle_group_invite, handle_power_cast, handle_entity_full_update, \
-    handle_entity_incremental_update, handle_request_door_state, Start_Skill_Research, \
+    handle_entity_incremental_update, Start_Skill_Research, \
     handle_research_claim, PaperDoll_Request, Skill_Research_Cancell_Request, Skill_SpeedUp, handle_building_upgrade, \
     handle_speedup_request, handle_cancel_upgrade, handle_train_talent_point, handle_talent_speedup, \
     handle_talent_claim, handle_clear_talent_research, handle_hp_increase_notice, handle_volume_enter, \
     handle_change_offset_y, handle_start_skit, handle_lockbox_reward, handle_linkupdater, \
     handle_emote_begin, Client_Crash_Reports, handle_mount_equip_packet, handle_pet_info_packet, \
     handle_collect_hatched_egg, handle_talk_to_npc, handle_char_regen, allocate_talent_tree_points, \
-    handle_respec_talent_tree, handle_building_claim, handle_login_version, handle_login_create, \
-    handle_login_authenticate, handle_character_select, handle_gameserver_login, handle_request_armory_gears, \
-    handle_level_transfer_request, handle_open_door, handle_login_character_create
-from Forge import magic_forge_packet, start_forge_packet, collect_forge_charm, cancel_forge_packet, \
+    handle_respec_talent_tree, handle_building_claim, handle_request_armory_gears
+from buildings import magic_forge_packet, start_forge_packet, collect_forge_charm, cancel_forge_packet, \
     use_forge_xp_consumable, allocate_talent_points
 from PolicyServer import start_policy_server
 from combat import handle_entity_destroy, PKTTYPE_BUFF_TICK_DOT, handle_respawn_ack, handle_request_respawn, \
@@ -28,6 +26,9 @@ from combat import handle_entity_destroy, PKTTYPE_BUFF_TICK_DOT, handle_respawn_
     handle_change_max_speed
 from globals import level_registry, session_by_token, all_sessions, char_tokens, token_char, extended_sent_map, HOST, \
     PORTS
+from level_config import handle_open_door, handle_level_transfer_request, handle_request_door_state
+from login import handle_login_version, handle_login_create, handle_login_authenticate, handle_login_character_create, \
+    handle_character_select, handle_gameserver_login
 from scheduler import set_active_session_resolver
 from static_server import start_static_server
 
@@ -85,25 +86,21 @@ class ClientSession:
         self.close_connection()
 
     def get_entity(self, entity_id):
-        """
-        Retrieve an entity from session.entities by its ID.
-        Returns the entity dictionary or None if not found.
-        """
         return self.entities.get(entity_id)
 
     def issue_token(self, char, target_level, previous_level):
-        # Backward-compat wrapper: we now keep a persistent token per session
         tk = self.ensure_token(char, target_level=target_level, previous_level=previous_level)
         return tk
 
     def ensure_token(self, char, target_level=None, previous_level=None):
-        key = (char.get("user_id"), char.get("name"))
+        key = (self.user_id, char.get("name"))
         if key in char_tokens:
             tk = char_tokens[key]
         else:
             tk = new_transfer_token()
             char_tokens[key] = tk
             token_char[tk] = key
+
         self.clientEntID = tk
         session_by_token[tk] = self
         return tk
@@ -148,7 +145,6 @@ class ClientSession:
             extended_sent_map[self.user_id]["last_seen"] = time.time()
 
 def prune_extended_sent_map(timeout: int = 2):
-    """Remove users from extended_sent_map if they haven't reconnected in 'timeout' seconds."""
     now = time.time()
     for uid, data in list(extended_sent_map.items()):
         if now - data.get("last_seen", now) > timeout:

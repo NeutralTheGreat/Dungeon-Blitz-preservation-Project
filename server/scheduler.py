@@ -8,9 +8,8 @@ import struct
 
 from BitBuffer import BitBuffer
 from Character import save_characters, load_characters, CHAR_SAVE_DIR
-from constants import class_111, class_64_const_218, class_1, class_66
+from constants import class_111, class_64_const_218, class_1
 
-# Will be set by server.py to resolve (user_id, char_name) → ClientSession
 active_session_resolver = None
 
 def set_active_session_resolver(fn):
@@ -282,6 +281,7 @@ def boot_scan_all_saves():
 
         chars = data.get("characters", [])
         dirty = False
+        user_id = data.get("user_id")
 
         for char in chars:
             research = char.get("SkillResearch")
@@ -291,7 +291,7 @@ def boot_scan_all_saves():
                     research["done"] = True
                     dirty = True
                 else:
-                    schedule_research(char.get("user_id"), char["name"], rt)
+                    schedule_research(user_id, char["name"], rt)
 
             bu = char.get("buildingUpgrade")
             entries = []
@@ -307,7 +307,7 @@ def boot_scan_all_saves():
                         upgrade["done"] = True
                         dirty = True
                     else:
-                        schedule_building_upgrade(char.get("user_id"), char["name"], rt)
+                        schedule_building_upgrade(user_id, char["name"], rt)
 
             mf = char.get("magicForge")
             if isinstance(mf, dict) and mf.get("hasSession") and mf.get("status") == class_111.const_286:
@@ -322,7 +322,7 @@ def boot_scan_all_saves():
                     dirty = True
                 else:
                     schedule_forge(
-                        char.get("user_id"),
+                        user_id,
                         char["name"],
                         ready_ts,
                         mf.get("primary", 0),
@@ -338,11 +338,7 @@ def boot_scan_all_saves():
                     dirty = True
                 else:
                     # still pending: schedule its completion
-                    schedule_Talent_point_research(
-                        char.get("user_id"),
-                        char["name"],
-                        rt
-                    )
+                    schedule_Talent_point_research(user_id, char["name"], rt)
 
         if dirty:
             with open(path, "w", encoding="utf-8") as f:

@@ -22,52 +22,7 @@ def build_level_gears_packet(gears_list: list[tuple[int, int]]) -> bytes:
 def get_inventory_gears(char: dict) -> list[tuple[int, int]]:
     inventory_gears = char.get("inventoryGears", [])
     return [(gear.get("gearID", 0), gear.get("tier", 0)) for gear in inventory_gears]
-# Hints Do not delete
-"""
-  "gearSets": [
-    {
-      "name": "PvP Build",    
-        "slots": [4 1181, (ChestPlate)
-                  5 1180, (Gloves)
-                  6 1182, (Boots)
-                  3 1181, (Hat)
-                  1 1177, (Sword)
-                  2 1178  (Shield)
-        ]
-    }
-  ]
-  "magicForge": {
-  "stats_by_building": {
-          "1": 10, # "Tome"
-          "2": 10, # "Forge"
-          
-          "3": 10, # "JusticarTower"
-          "4": 10, # "SentinelTower"
-          "5": 10, # "TemplarTower"
-          
-          "6": 10, # "FrostwardenTower"
-          "7": 10, # "FlameseerTower"
-          "8": 10, # "NecromancerTower"
-          
-          "9": 10, # "ExecutionerTower"
-          "10": 10, # "ShadowwalkerTower"
-          "11": 10, # "SoulthiefTower"
-          
-          "12": 0, # "Keep"
-          "13": 10 # "Barn"
-        },
-  "hasSession": true,    // 1bit: whether a forge session exists (controls reading the session block)
-  "primary": 90,         // primary gem/charm type ID (6 bits)
-  "secondary": 5,        // secondary buff ID (only read if status==2 and var_8==1)
-  "status": 1,           // 1=in‑progress (timer), 2=completed (secondary buffs)
-  "duration": 900000,    // remaining time in ms (used to compute endtime when status==1)
-  "var_8": 1,            // flag for “secondary present” (1 bit, read only when status!=1)
-  "usedlist": 2,         // number of items/idols used or buff count (read if var_8==1)
-  "var_2675": 2,         // extra small stat #1 (16 bits, always read)
-  "var_2316": 2,         // extra small stat #2 (16 bits, always read)
-  "var_2434": true       // final continuation flag (1 bit; often used to toggle UI)
-}
-"""
+
 # ──────────────── Default full gear definitions ────────────────
 # Each sub-list is [GearID, Rune1, Rune2, Rune3, Color1, Color2]
 DEFAULT_GEAR = {
@@ -101,7 +56,7 @@ CHAR_SAVE_DIR = "saves"
 SAVE_PATH_TEMPLATE = "saves/{user_id}.json"
 
 def load_characters(user_id: str) -> list[dict]:
-    """Load the list of characters for a given user_id."""
+    """Load all characters for a given user_id (new format)."""
     path = os.path.join(CHAR_SAVE_DIR, f"{user_id}.json")
     if not os.path.exists(path):
         return []
@@ -109,22 +64,20 @@ def load_characters(user_id: str) -> list[dict]:
         data = json.load(f)
     return data.get("characters", [])
 
+
 def save_characters(user_id: str, char_list: list[dict]):
-    """Save the list of characters for a given user_id, preserving other fields."""
+    """Save all characters for a user_id in the new format."""
     os.makedirs(CHAR_SAVE_DIR, exist_ok=True)
     path = os.path.join(CHAR_SAVE_DIR, f"{user_id}.json")
-    # Load existing to preserve email and other fields
-    if user_id is None:
-        print("Warning: Attempted to save characters with user_id=None")
-        return
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    else:
-        data = {"email": None, "characters": []}
-    data["characters"] = char_list
+
+    data = {
+        "user_id": user_id,
+        "characters": char_list
+    }
+
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
 
 def build_paperdoll_packet(character_dict):
     buf = BitBuffer(debug=True)  # Enable debug for tracing
