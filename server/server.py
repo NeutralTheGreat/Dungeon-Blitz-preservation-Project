@@ -26,7 +26,8 @@ from combat import handle_entity_destroy, PKTTYPE_BUFF_TICK_DOT, handle_respawn_
     handle_change_max_speed
 from globals import level_registry, session_by_token, all_sessions, char_tokens, token_char, extended_sent_map, HOST, \
     PORTS
-from level_config import handle_open_door, handle_level_transfer_request, handle_request_door_state
+from level_config import handle_open_door, handle_level_transfer_request, handle_request_door_state, LEVEL_CONFIG, \
+    SPAWN_POINTS
 from login import handle_login_version, handle_login_create, handle_login_authenticate, handle_login_character_create, \
     handle_character_select, handle_gameserver_login
 from scheduler import set_active_session_resolver
@@ -105,6 +106,36 @@ class ClientSession:
         session_by_token[tk] = self
         return tk
 
+    def save_player_position(self):
+        """Save player position if not in a dungeon or if in CraftTown."""
+        try:
+            if not (self.user_id and self.char_list and self.current_character):
+                return
+
+            for char in self.char_list:
+                if char.get("name") == self.current_character:
+                    current_level = getattr(self, "current_level", None)
+                    ent = self.entities.get(self.clientEntID, {})
+
+                    if current_level and ent:
+                        # check dungeon flag
+                        is_dungeon = LEVEL_CONFIG.get(current_level, (None, None, None, False))[3]
+                        if not is_dungeon or current_level == "CraftTown":
+                            char["CurrentLevel"] = {
+                                "name": current_level,
+                                "x": ent.get("pos_x", 0),
+                                "y": ent.get("pos_y", 0),
+                            }
+                            save_characters(self.user_id, self.char_list)
+                            print(
+                                f"[{self.addr}] Saved character {self.current_character}: "
+                                f"{char.get('CurrentLevel', {})}"
+                            )
+                    break
+
+        except Exception as e:
+            print(f"[{self.addr}] Error saving player position: {e}")
+
     def close_connection(self):
         try:
             self.conn.close()
@@ -112,22 +143,7 @@ class ClientSession:
             pass
 
         try:
-            if self.user_id and self.char_list and self.current_character:
-                for char in self.char_list:
-                    if char.get("name") == self.current_character:
-                        # save last known position and level from memory
-                        current_level = getattr(self, "current_level", None)
-                        ent = self.entities.get(self.clientEntID, {})
-                        if current_level and ent:
-                            char["CurrentLevel"] = {
-                                "name": current_level,
-                                "x": ent.get("pos_x", 0),
-                                "y": ent.get("pos_y", 0),
-                            }
-                        break
-                save_characters(self.user_id, self.char_list)
-                print(f"[{self.addr}] Saved character {self.current_character}: "f"{char.get('CurrentLevel', {})}")
-                      
+            self.save_player_position()  # replaces old coordinate-saving logic
         except Exception as e:
             print(f"[{self.addr}] Error saving on disconnect: {e}")
 
@@ -143,6 +159,7 @@ class ClientSession:
 
         if self.user_id in extended_sent_map:
             extended_sent_map[self.user_id]["last_seen"] = time.time()
+
 
 def prune_extended_sent_map(timeout: int = 2):
     now = time.time()
