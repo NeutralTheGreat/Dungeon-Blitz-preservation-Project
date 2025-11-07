@@ -155,8 +155,10 @@ class class_10:
     const_105 = 10
 
 class class_8:
+    const_1299 = 0.01
     const_658 = 7
     const_731 = 7
+    const_1055 = [1800, 4800, 10800, 21600, 36000, 64800, 96000, 144000, 192000, 288000]
 
 class class_7 :
     const_19 = 7
@@ -257,6 +259,8 @@ class class_1:
 
 class class_64:
     const_101 = 16
+    const_1073 = 345600
+    const_1166= 86400
 
 class GearType:
     GEARTYPE_BITSTOSEND = 11
@@ -339,3 +343,7 @@ def find_building_data(building_id: int, rank: int):
         if int(b.get("BuildingID", -1)) == building_id and int(b.get("Rank", -1)) == rank:
             return b
     return None
+
+# Load charm database (used to calculate forge times)
+with open("data/Charms.json", "r", encoding="utf-8") as f:
+    CHARM_DB = {int(c["CharmID"]): c for c in json.load(f)}

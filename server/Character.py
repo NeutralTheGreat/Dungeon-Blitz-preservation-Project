@@ -5,6 +5,54 @@ import struct
 from BitBuffer import BitBuffer
 from constants import GearType, GEARTYPE_BITS
 
+# Hints Do not delete
+"""
+  "gearSets": [
+    {
+      "name": "PvP Build",    
+        "slots": [4 1181, (ChestPlate)
+                  5 1180, (Gloves)
+                  6 1182, (Boots)
+                  3 1181, (Hat)
+                  1 1177, (Sword)
+                  2 1178  (Shield)
+        ]
+    }
+  ]
+  "magicForge": {
+  "stats_by_building": {
+          "1": 10, # "Tome"
+          "2": 10, # "Forge"
+
+          "3": 10, # "JusticarTower"
+          "4": 10, # "SentinelTower"
+          "5": 10, # "TemplarTower"
+
+          "6": 10, # "FrostwardenTower"
+          "7": 10, # "FlameseerTower"
+          "8": 10, # "NecromancerTower"
+
+          "9": 10, # "ExecutionerTower"
+          "10": 10, # "ShadowwalkerTower"
+          "11": 10, # "SoulthiefTower"
+
+          "12": 0, # "Keep"
+          "13": 10 # "Barn"
+        },
+  "hasSession": true,    // 1bit: whether a forge session exists (controls reading the session block)
+  "primary": 90,         // primary gem/charm type ID (6 bits)
+  "secondary": 5,        // secondary buff ID (only read if status==2 and var_8==1)
+  "status": 1,           // 1=in‑progress (timer), 2=completed (secondary buffs)
+  "ReadyTime": 900000,    // remaining time in ms (used to compute endtime when status==1)
+  "var_8": 1,            // flag for “secondary present” (1 bit, read only when status!=1)
+  "usedlist": 2,         // number of items/idols used or buff count (read if var_8==1)
+  "var_2675": 2,         // extra small stat #1 (16 bits, always read)
+  "var_2316": 2,         // extra small stat #2 (16 bits, always read)
+  "var_2434": true       // final continuation flag (1 bit; often used to toggle UI)
+}
+
+"""
+
 def load_class_template(class_name: str) -> dict:
     path = os.path.join("data", f"{class_name.lower()}_template.json")
     with open(path, "r", encoding="utf-8") as f:
