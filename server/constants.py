@@ -155,6 +155,7 @@ class class_10:
     const_105 = 10
 
 class class_8:
+    const_1018 = [1,2,3,4,5,7,10,13,16,20]
     const_1299 = 0.01
     const_658 = 7
     const_731 = 7

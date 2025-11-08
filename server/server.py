@@ -20,7 +20,7 @@ from Commands import handle_hotbar_packet, handle_masterclass_packet, handle_gea
     handle_respec_talent_tree, handle_request_armory_gears
 from PolicyServer import start_policy_server
 from Forge import forge_speed_up_packet, start_forge_packet, collect_forge_charm, cancel_forge_packet, \
-    use_forge_xp_consumable, allocate_talent_points
+    use_forge_xp_consumable, allocate_talent_points, magic_forge_reroll
 from buildings import handle_building_claim, handle_building_upgrade, handle_building_speed_up_request, \
     handle_cancel_building_upgrade
 from combat import handle_entity_destroy, PKTTYPE_BUFF_TICK_DOT, handle_respawn_ack, handle_request_respawn, \
@@ -355,8 +355,6 @@ def handle_client(session: ClientSession):
                 handle_request_armory_gears(session, data, conn)
             ############################################
 
-            #TODO...
-            # Forge related packets
             ############################################
             elif pkt == 0xE2:
                 forge_speed_up_packet(session, data)
@@ -370,6 +368,8 @@ def handle_client(session: ClientSession):
                 use_forge_xp_consumable(session, data)
             elif pkt == 0xD3:
                 allocate_talent_points(session, data)
+            elif pkt == 0xCF:
+                magic_forge_reroll(session, data)
             ############################################
 
             ############################################

@@ -355,3 +355,70 @@ def allocate_talent_points(session, data):
 
     char["craftTalentPoints"] = points
     save_characters(session.user_id, session.char_list)
+
+def magic_forge_reroll(session, data):
+    br = BitReader(data[4:])
+    current_usedlist = br.read_method_20(class_111.const_432)
+    print(f"[{session.addr}] Forge reroll request (usedlist={current_usedlist})")
+
+    char = next((c for c in session.player_data.get("characters", [])
+                 if c.get("name") == session.current_character), None)
+    if not char:
+        print(f"[{session.addr}] Character {session.current_character} not found")
+        return
+
+    mf = char.get("magicForge", {})
+    if not (mf.get("hasSession") and mf.get("status") == class_111.const_264):
+        print(f"[{session.addr}] No completed forge available for reroll")
+        return
+
+    primary = int(mf.get("primary", 0))
+    var_8 = int(mf.get("var_8", 0))
+    secondary = int(mf.get("secondary", 0))
+    usedlist = int(mf.get("usedlist", 0))
+    if usedlist >= class_111.const_1101:
+        print(f"[{session.addr}] Reroll limit reached (usedlist={usedlist})")
+        return
+
+    cost = 20
+    char["mammothIdols"] = max(0, int(char.get("mammothIdols", 0)) - cost)
+
+    # Send currency update to client
+    send_premium_purchase(session, "Forge Reroll", cost)
+
+    # Increment usedlist
+    usedlist += 1
+    mf["usedlist"] = usedlist
+
+    # Re-roll new secondary + rarity
+    new_secondary, new_var8 = pick_secondary_rune(primary, [False] * 4, char)
+
+    # Ensure rerolls always produce a valid secondary (client expects it)
+    if not new_secondary or new_secondary <= 0:
+        new_secondary = random.randint(1, 9)
+
+    # Rare or Legendary tier must exist (1 or 2)
+    if not new_var8 or new_var8 <= 0:
+        new_var8 = random.choice([1, 2])
+
+    mf["secondary"] = new_secondary
+    mf["var_8"] = new_var8
+
+    print(f"[{session.addr}] Forge rerolled → cost={cost} idols, new secondary={new_secondary}, var_8={new_var8}, usedlist={usedlist}")
+
+    save_path = SAVE_PATH_TEMPLATE.format(user_id=session.user_id)
+    with open(save_path, "w", encoding="utf-8") as f:
+        json.dump(session.player_data, f, indent=2)
+
+    bb = BitBuffer()
+    bb.write_method_6(primary, class_1_const_254)
+    bb.write_method_91(int(mf.get("var_2675", 0)))
+    bb.write_method_91(int(mf.get("var_2316", 0)))
+    bb.write_method_6(new_var8, class_64.const_499)
+    if new_var8:
+        bb.write_method_6(new_secondary, class_64.const_218)
+        bb.write_method_6(usedlist, class_111.const_432)
+
+    pkt = struct.pack(">HH", 0xCD, len(bb.to_bytes())) + bb.to_bytes()
+    session.conn.sendall(pkt)
+    print(f"[{session.addr}] Sent 0xCD forge reroll update")
