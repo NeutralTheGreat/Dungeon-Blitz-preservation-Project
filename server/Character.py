@@ -19,7 +19,6 @@ from constants import GearType, GEARTYPE_BITS
         ]
     }
   ]
-  "magicForge": {
   "stats_by_building": {
           "1": 10, # "Tome"
           "2": 10, # "Forge"
@@ -39,16 +38,6 @@ from constants import GearType, GEARTYPE_BITS
           "12": 0, # "Keep"
           "13": 10 # "Barn"
         },
-  "hasSession": true,    // 1bit: whether a forge session exists (controls reading the session block)
-  "primary": 90,         // primary gem/charm type ID (6 bits)
-  "secondary": 5,        // secondary buff ID (only read if status==2 and var_8==1)
-  "status": 1,           // 1=in‑progress (timer), 2=completed (secondary buffs)
-  "ReadyTime": 900000,    // remaining time in ms (used to compute endtime when status==1)
-  "var_8": 1,            // flag for “secondary present” (1 bit, read only when status!=1)
-  "usedlist": 2,         // number of items/idols used or buff count (read if var_8==1)
-  "var_2675": 2,         // extra small stat #1 (16 bits, always read)
-  "var_2316": 2,         // extra small stat #2 (16 bits, always read)
-  "var_2434": true       // final continuation flag (1 bit; often used to toggle UI)
 }
 
 """
