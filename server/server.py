@@ -6,18 +6,18 @@ import threading
 import time
 
 from Character import save_characters
-from Commands import handle_equip_skills, handle_masterclass_packet, handle_gear_packet, \
+from Commands import handle_masterclass_packet, handle_gear_packet, \
     handle_apply_dyes, handle_equip_rune, handle_change_look, handle_create_gearset, handle_name_gearset, \
     handle_apply_gearset, handle_update_equipment, handle_private_message, \
     handle_public_chat, handle_group_invite, handle_power_cast, \
-    handle_entity_incremental_update, Start_Skill_Research, \
-    handle_research_claim, PaperDoll_Request, Skill_Research_Cancell_Request, Skill_SpeedUp, \
-    handle_train_talent_point, handle_talent_speedup, \
+    handle_entity_incremental_update, PaperDoll_Request, handle_train_talent_point, handle_talent_speedup, \
     handle_talent_claim, handle_clear_talent_research, handle_hp_increase_notice, handle_volume_enter, \
     handle_change_offset_y, handle_start_skit, handle_lockbox_reward, handle_linkupdater, \
     handle_emote_begin, Client_Crash_Reports, handle_mount_equip_packet, handle_pet_info_packet, \
     handle_collect_hatched_egg, handle_talk_to_npc, handle_char_regen, allocate_talent_tree_points, \
     handle_respec_talent_tree, handle_request_armory_gears
+from skills import handle_skill_trained_claim, handle_skill_research_cancel_request, handle_skill_speed_up_request, handle_start_skill_training, \
+    handle_equip_active_skills
 from PolicyServer import start_policy_server
 from Forge import forge_speed_up_packet, start_forge_packet, collect_forge_charm, cancel_forge_packet, \
     use_forge_xp_consumable, allocate_talent_points, magic_forge_reroll
@@ -303,15 +303,15 @@ def handle_client(session: ClientSession):
             # Skill Related packets
             ############################################
             elif pkt == 0xBD:
-                handle_equip_skills(session, data)
+                handle_equip_active_skills(session, data)
             elif pkt == 0xBE:
-                Start_Skill_Research(session, data, conn)
+                handle_start_skill_training(session, data, conn)
             elif pkt == 0xD1:
-                handle_research_claim(session)
+                handle_skill_trained_claim(session)
             elif pkt == 0xDD:
-                Skill_Research_Cancell_Request(session)
+                handle_skill_research_cancel_request(session)
             elif pkt == 0xDE:
-                Skill_SpeedUp(session, data)
+                handle_skill_speed_up_request(session, data)
             ############################################
 
             # Entity Visuals related packets
