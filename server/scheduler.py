@@ -10,7 +10,7 @@ import struct
 from BitBuffer import BitBuffer
 from Character import save_characters, load_characters, CHAR_SAVE_DIR
 from constants import class_111, class_64_const_218, class_1
-from globals import send_skill_complete_packet
+from globals import send_skill_complete_packet, send_building_complete_packet
 
 active_session_resolver = None
 
@@ -164,12 +164,7 @@ def _on_building_done_for(user_id: str, char_name: str):
         mem_char["buildingUpgrade"] = char["buildingUpgrade"].copy()
 
     try:
-        bb = BitBuffer()
-        bb.write_method_6(building_id, 5)
-        bb.write_method_6(new_rank, 5)
-        bb.write_method_15(True)
-        payload = bb.to_bytes()
-        session.conn.sendall(struct.pack(">HH", 0xD8, len(payload)) + payload)
+        send_building_complete_packet(session, building_id, new_rank)
         print(f"[{session.addr}] Sent building-complete (0xD8) ID={building_id}, rank={new_rank}")
     except Exception as e:
         print(f"[Scheduler] building notify failed: {e}")

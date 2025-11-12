@@ -25,8 +25,16 @@ def _level_add(level, session):
 # Helpers
 #############################################
 
+def send_building_complete_packet(session, building_id: int, rank: int):
+    bb = BitBuffer()
+    bb.write_method_6(building_id, 5)  # class_9.const_129
+    bb.write_method_6(rank, 5)         # class_9.const_28
+    bb.write_method_15(True)           # complete flag
+    payload = bb.to_bytes()
+    session.conn.sendall(struct.pack(">HH", 0xD8, len(payload)) + payload)
+    print(f"[{session.addr}] Sent 0xD8 building complete → id={building_id}, rank={rank}")
+
 def send_skill_complete_packet(session, ability_id: int):
-    """Send 0xBF Ability Research Complete packet."""
     bb = BitBuffer()
     bb.write_method_6(ability_id, 7)
     payload = bb.to_bytes()
