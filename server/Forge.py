@@ -175,7 +175,7 @@ def pick_secondary_rune(
 #             Forge Function Handlers
 #########################################################
 
-def start_forge_packet(session, data):
+def handle_start_forge(session, data):
     br = BitReader(data[4:])
     primary = br.read_method_20(class_1.const_254)
 
@@ -248,7 +248,7 @@ def start_forge_packet(session, data):
     #    f"({duration_sec}s), primary={primary}, secondary={secondary}, var_8={var_8}"
     #)
 
-def forge_speed_up_packet(session, data):
+def handle_forge_speed_up_packet(session, data):
     br = BitReader(data[4:])
     idols_to_spend = br.read_method_9()
     char = next((c for c in session.player_data.get("characters", [])if c.get("name") == session.current_character), None)
@@ -295,7 +295,7 @@ def forge_speed_up_packet(session, data):
     pkt = struct.pack(">HH", 0xCD, len(bb.to_bytes())) + bb.to_bytes()
     session.conn.sendall(pkt)
 
-def collect_forge_charm(session, data):
+def handle_collect_forge_charm(session, data):
     char = next((c for c in session.player_data.get("characters", [])if c.get("name") == session.current_character), None)
 
     mf = char.get("magicForge", {})
@@ -341,7 +341,7 @@ def collect_forge_charm(session, data):
     with open(SAVE_PATH_TEMPLATE.format(user_id=session.user_id), "w", encoding="utf-8") as f:
         json.dump(session.player_data, f, indent=2)
 
-def cancel_forge_packet(session, data):
+def handle_cancel_forge(session, data):
     chars = session.player_data.get("characters", [])
     char = next((c for c in chars if c["name"] == session.current_character), None)
 
@@ -360,7 +360,7 @@ def cancel_forge_packet(session, data):
     with open(save_path, "w", encoding="utf-8") as f:
         json.dump(session.player_data, f, indent=2)
 
-def use_forge_xp_consumable(session, data):
+def handle_use_forge_xp_consumable(session, data):
     payload = data[4:]
     br = BitReader(payload)
     cid = br.read_method_20(class_3.const_69)
@@ -383,7 +383,7 @@ def use_forge_xp_consumable(session, data):
     save_characters(session.user_id, session.char_list)
     send_consumable_update(session.conn, cid, new_count)
 
-def allocate_talent_points(session, data):
+def handle_allocate_magic_forge_artisan_skill_points(session, data):
     payload = data[4:]
     br = BitReader(payload)
     packed = br.read_method_9()
@@ -394,7 +394,7 @@ def allocate_talent_points(session, data):
     char["craftTalentPoints"] = points
     save_characters(session.user_id, session.char_list)
 
-def magic_forge_reroll(session, data):
+def handle_magic_forge_reroll(session, data):
     br = BitReader(data[4:])
     current_usedlist = br.read_method_20(class_111.const_432)
 

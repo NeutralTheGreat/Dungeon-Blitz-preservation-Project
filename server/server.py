@@ -19,8 +19,8 @@ from Commands import handle_masterclass_packet, handle_gear_packet, \
 from skills import handle_skill_trained_claim, handle_skill_research_cancel_request, handle_skill_speed_up_request, handle_start_skill_training, \
     handle_equip_active_skills
 from PolicyServer import start_policy_server
-from Forge import forge_speed_up_packet, start_forge_packet, collect_forge_charm, cancel_forge_packet, \
-    use_forge_xp_consumable, allocate_talent_points, magic_forge_reroll
+from Forge import handle_forge_speed_up_packet, handle_start_forge, handle_collect_forge_charm, handle_cancel_forge, \
+    handle_use_forge_xp_consumable, handle_allocate_magic_forge_artisan_skill_points, handle_magic_forge_reroll
 from buildings import handle_building_claim, handle_building_upgrade, handle_building_speed_up_request, \
     handle_cancel_building_upgrade
 from combat import handle_entity_destroy, PKTTYPE_BUFF_TICK_DOT, handle_respawn_ack, handle_request_respawn, \
@@ -357,19 +357,19 @@ def handle_client(session: ClientSession):
 
             ############################################
             elif pkt == 0xE2:
-                forge_speed_up_packet(session, data)
+                handle_forge_speed_up_packet(session, data)
             elif pkt == 0xD0:
-                collect_forge_charm(session, data)
+                handle_collect_forge_charm(session, data)
             elif pkt == 0xB1:
-                start_forge_packet(session, data)
+                handle_start_forge(session, data)
             elif pkt == 0xE1:
-                cancel_forge_packet(session, data)
+                handle_cancel_forge(session, data)
             elif pkt == 0x110:
-                use_forge_xp_consumable(session, data)
+                handle_use_forge_xp_consumable(session, data)
             elif pkt == 0xD3:
-                allocate_talent_points(session, data)
+                handle_allocate_magic_forge_artisan_skill_points(session, data)
             elif pkt == 0xCF:
-                magic_forge_reroll(session, data)
+                handle_magic_forge_reroll(session, data)
             ############################################
 
             ############################################
