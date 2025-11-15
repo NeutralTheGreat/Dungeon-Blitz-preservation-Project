@@ -279,6 +279,10 @@ def boot_scan_all_saves():
         user_id = data.get("user_id")
 
         for char in chars:
+            if not isinstance(char, dict):
+                print(f"[SCHEDULER] Skipping invalid character entry: {char}")
+                continue
+
             research = char.get("SkillResearch")
             if research and not research.get("done", False):
                 rt = research.get("ReadyTime", 0)
