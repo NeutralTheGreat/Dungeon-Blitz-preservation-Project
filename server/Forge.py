@@ -394,55 +394,43 @@ def handle_allocate_magic_forge_artisan_skill_points(session, data):
     char["craftTalentPoints"] = points
     save_characters(session.user_id, session.char_list)
 
+def pick_unused_property(client_usedlist: int) -> int:
+    """Return a random property ID (1-9) that is NOT in usedlist."""
+    available = [i for i in range(1, 10)
+                 if not (client_usedlist & (1 << (i - 1)))]
+    if not available:
+        return None
+    return random.choice(available)
+
 def handle_magic_forge_reroll(session, data):
     br = BitReader(data[4:])
-    current_usedlist = br.read_method_20(class_111.const_432)
+    client_usedlist = br.read_method_20(class_111.const_432)
 
-    char = next(
-        (c for c in session.player_data.get("characters", [])
-         if c.get("name") == session.current_character),
-        None
-    )
-
-    mf = char.get("magicForge", {})
+    char = next((c for c in session.char_list
+                 if c.get("name") == session.current_character), None)
+    mf = char.setdefault("magicForge", {})
     primary = int(mf.get("primary", 0))
-    var_8 = int(mf.get("secondary_tier", 0))
-    secondary = int(mf.get("secondary", 0))
-    usedlist = int(mf.get("usedlist", 0))
 
-    # All 9 properties already rolled (0b111111111 = 511)
-    if usedlist >= class_111.const_1101:
-        return
-
+    #  Deduct idols
     forge_level = get_forge_level(mf)
     cost = class_8.FORGE_REROLL_COSTS[forge_level - 1]
-    char["mammothIdols"] = max(0, int(char.get("mammothIdols", 0)) - cost)
+    current_idols = int(char.get("mammothIdols", 0))
+    char["mammothIdols"] = current_idols - cost
     send_premium_purchase(session, "Forge Reroll", cost)
 
-    # Try reroll until we get a property not previously used
-    attempts = 0
-    while True:
-        new_secondary, new_var8 = pick_secondary_rune(primary, [False] * 4, char)
+    new_secondary = pick_unused_property(client_usedlist)
+    if not new_secondary:
+        print("[Forge] ERROR: No unused properties but usedlist < 511")
+        return
 
-        if not new_secondary or new_secondary <= 0:
-            new_secondary = random.randint(1, 9)
-        if not new_var8 or new_var8 <= 0:
-            new_var8 = random.choice([1, 2])
+    new_tier = random.choice([1, 2])
 
-        # Stop if this property hasn't been reforged before
-        if not (usedlist & (1 << (new_secondary - 1))):
-            break
+    # Update server state
+    new_usedlist = client_usedlist | (1 << (new_secondary - 1))
 
-        attempts += 1
-        if attempts > 20:
-            print("[Forge] Could not find unused property after 20 attempts, forcing new random.")
-            break
-
-    # Mark this property as used in the bitmask
-    usedlist |= (1 << (new_secondary - 1))
-    mf["usedlist"] = usedlist
     mf["secondary"] = new_secondary
-    mf["secondary_tier"] = new_var8
+    mf["secondary_tier"] = new_tier
+    mf["usedlist"] = new_usedlist
 
     save_path = SAVE_PATH_TEMPLATE.format(user_id=session.user_id)
     with open(save_path, "w", encoding="utf-8") as f:
@@ -452,10 +440,9 @@ def handle_magic_forge_reroll(session, data):
     bb.write_method_6(primary, class_1_const_254)
     bb.write_method_91(int(mf.get("forge_roll_a", 0)))
     bb.write_method_91(int(mf.get("forge_roll_b", 0)))
-    bb.write_method_6(new_var8, class_64.const_499)
-    if new_var8:
-        bb.write_method_6(new_secondary, class_64.const_218)
-        bb.write_method_6(usedlist, class_111.const_432)
+    bb.write_method_6(new_tier, class_64.const_499)
+    bb.write_method_6(new_secondary, class_64.const_218)
+    bb.write_method_6(new_usedlist, class_111.const_432)
 
-    pkt = struct.pack(">HH", 0xCD, len(bb.to_bytes())) + bb.to_bytes()
-    session.conn.sendall(pkt)
+    payload = bb.to_bytes()
+    session.conn.sendall(struct.pack(">HH", 0xCD, len(payload)) + payload)
