@@ -1,13 +1,45 @@
+import pprint
 import struct
 
 from BitBuffer import BitBuffer
 from Character import save_characters
 from Commands import build_loot_drop_packet
 from bitreader import BitReader
-from constants import LinkUpdater
+from constants import LinkUpdater, Entity
 from globals import send_consumable_update
+from level_config import SPAWN_POINTS
 
+                # Helpers
+    #####################################
+def get_player_coordinates(session):
+    ent_id = session.clientEntID
+    ent = session.entities.get(ent_id)
 
+    if ent:
+        x = ent.get("pos_x")
+        y = ent.get("pos_y")
+        if x is not None and y is not None:
+            return int(x), int(y)
+
+    char = next((c for c in session.char_list
+                 if c.get("name") == session.current_character), None)
+    if char:
+        lvl = char.get("CurrentLevel", {})
+        if isinstance(lvl, dict) and "x" in lvl and "y" in lvl:
+            return int(lvl["x"]), int(lvl["y"])
+
+    spawn = SPAWN_POINTS.get(session.current_level, {"x": 0, "y": 0})
+    return int(spawn["x"]), int(spawn["y"])
+
+def get_base_hp_for_level(level):
+    if level < 1:
+        level = 1
+    if level >= len(Entity.PLAYER_HITPOINTS):
+        level = len(Entity.PLAYER_HITPOINTS) - 1
+    return Entity.PLAYER_HITPOINTS[level]
+
+        # game client function handlers
+       #####################################
 def handle_entity_destroy(session, data, all_sessions):
     payload = data[4:]
     br = BitReader(payload, debug=False)
@@ -57,69 +89,65 @@ def PKTTYPE_BUFF_TICK_DOT(session, data, all_sessions):
             except Exception as e:
                 print(f"[{session.addr}] [PKT79] Forward error to {other.addr}: {e}")
 
-def handle_respawn_ack(session, data, all_sessions):
+def handle_respawn_broadcast(session, data, all_sessions):
+    br = BitReader(data[4:])
 
-    br = BitReader(data[4:], debug=False)
-    try:
-        entity_id = br.read_method_9()
-        spawn_pos = br.read_method_24()
-        used_potion = bool(br.read_method_15())
-    except Exception as e:
-        print(f"[{session.addr}] [PKT82] Parse error: {e}")
-        return
+    ent_id = br.read_method_9()
+    heal_amount = br.read_method_24()
+    used_potion = br.read_method_15()
+    ent = session.entities.get(ent_id)
 
-    # Update server state: mark entity alive at spawn_pos
-    ent = session.entities.get(entity_id)
-    if ent is not None:
-        ent['pos_x'] = spawn_pos
-        ent['pos_y'] = 0
-        ent['is_alive'] = True
-        print(f"[{session.addr}] [PKT82] Entity {entity_id} respawned at {spawn_pos}, potion={used_potion}")
+    ent["dead"] = False
+    ent["entState"] = 1
 
-        for other in all_sessions:
-            if other is not session and other.world_loaded and other.current_level == session.current_level:
-                other.conn.sendall(data)
+    char = next((c for c in session.char_list if c.get("name") == session.current_character), None)
+    if char:
+        level = char.get("level", 1)
+        max_hp = get_base_hp_for_level(level)
     else:
-        print(f"[{session.addr}] [PKT82] Unknown entity {entity_id}")
+        max_hp = heal_amount
 
-def handle_request_respawn(session, data, all_sessions):
-    br = BitReader(data[4:], debug=False)
-    try:
-        use_potion = bool(br.read_method_15())
-    except:
-        return
+    ent["hp"] = min(heal_amount, max_hp)
+
+    bb = BitBuffer()
+    bb.write_method_4(ent_id)
+    bb.write_signed_method_45(heal_amount)
+    payload = bb.to_bytes()
+    pkt = struct.pack(">HH", 0x82, len(payload)) + payload
+
+    for other in all_sessions:
+        if other is not session and other.world_loaded and other.current_level == session.current_level:
+            other.conn.sendall(pkt)
+
+def handle_request_respawn(session, data):
+    br = BitReader(data[4:])
+    use_potion = br.read_method_15()
 
     if use_potion:
-        for char in session.char_list:
-            if char['name'] == session.current_character:
-                for item in char.get('consumables', []):
-                    if item.get('consumableID') == 9:
-                        if item['count'] > 0:
-                            item['count'] -= 1
-                            new_count = item['count']
-                            print(f"[{session.addr}] [PKT77] Used potion, new count={new_count}")
-                            save_characters(session.user_id, session.char_list)
-                            send_consumable_update(session.conn, 9, new_count)
-                        break
-                break
+        char = next((c for c in session.char_list
+                     if c.get("name") == session.current_character), None)
+        if char:
+            for itm in char.get("consumables", []):
+                if itm.get("consumableID") == 9 and itm.get("count", 0) > 0:
+                    itm["count"] -= 1
+                    save_characters(session.user_id, session.char_list)
+                    send_consumable_update(session.conn, 9, itm["count"])
+                    break
+    else:
+        char = next((c for c in session.char_list
+                     if c.get("name") == session.current_character), None)
 
-    # 4) Send RESPAWN_COMPLETE (0x80)
-    #TODO....
-    # compute actual spawn location
-    spawn_pos = 0
+    # Compute heal amount based on level
+    level = char.get("level", 1)
+    heal_amount = get_base_hp_for_level(level)
+
+    # Send RespawnComplete
     bb = BitBuffer()
-    bb.write_signed_method_45(spawn_pos)
-    bb.write_method_11(1 if use_potion else 0, 1)
-    body = bb.to_bytes()
-    session.conn.sendall(struct.pack(">HH", 0x80, len(body)) + body)
+    bb.write_method_24(heal_amount)
+    bb.write_method_15(use_potion)
+    payload = bb.to_bytes()
 
-    heal_amount = 10000
-    bb2 = BitBuffer()
-    bb2.write_method_9(session.clientEntID or 0)
-    bb2.write_method_24(heal_amount)
-    body2 = bb2.to_bytes()
-    session.conn.sendall(struct.pack(">HH", 0x78, len(body2)) + body2)
-    print(f"[{session.addr}] [PKT77] Respawned at {spawn_pos}, potion_used={use_potion}")
+    session.conn.sendall(struct.pack(">HH", 0x80, len(payload)) + payload)
 
 def handle_grant_reward(session, data, all_sessions):
     payload = data[4:]
