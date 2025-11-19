@@ -65,29 +65,21 @@ def handle_entity_destroy(session, data, all_sessions):
             except Exception as e:
                 print(f"[{session.addr}] [PKT0D] Error sending to {other.addr}: {e}")
 
-def PKTTYPE_BUFF_TICK_DOT(session, data, all_sessions):
-    payload = data[4:]
-    br = BitReader(payload, debug=False)
-    try:
-        target_id     = br.read_method_9()
-        source_id     = br.read_method_9()
-        power_type_id = br.read_method_9()
-        amount        = br.read_method_24()
-    except Exception as e:
-        print(f"[{session.addr}] [PKT79] Parse error: {e}, raw={payload.hex()}")
-        return
 
-    print(f"[{session.addr}] [PKT79] Buff tick: target={target_id}, "
-          f"source={source_id}, power={power_type_id}, amount={amount}")
-
+def handle_buff_tick_dot(session, data, all_sessions):
+    br = BitReader(data[4:])
+    target_id = br.read_method_9()
+    source_id = br.read_method_9()
+    power_type_id = br.read_method_9()
+    amount = br.read_method_24()
+    # Broadcast unchanged packet to other players in same level
     for other in all_sessions:
-        if (other is not session
-            and other.world_loaded
-            and other.current_level == session.current_level):
-            try:
-                other.conn.sendall(data)
-            except Exception as e:
-                print(f"[{session.addr}] [PKT79] Forward error to {other.addr}: {e}")
+        if (
+                other is not session
+                and other.world_loaded
+                and other.current_level == session.current_level
+        ):
+            other.conn.sendall(data)
 
 def handle_respawn_broadcast(session, data, all_sessions):
     br = BitReader(data[4:])

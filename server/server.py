@@ -24,7 +24,7 @@ from Forge import handle_forge_speed_up_packet, handle_start_forge, handle_colle
     handle_use_forge_xp_consumable, handle_allocate_magic_forge_artisan_skill_points, handle_magic_forge_reroll
 from buildings import handle_building_claim, handle_building_upgrade, handle_building_speed_up_request, \
     handle_cancel_building_upgrade
-from combat import handle_entity_destroy, PKTTYPE_BUFF_TICK_DOT, handle_respawn_broadcast, handle_request_respawn, \
+from combat import handle_entity_destroy, handle_buff_tick_dot, handle_respawn_broadcast, handle_request_respawn, \
     handle_grant_reward, handle_power_hit, handle_projectile_explode, handle_add_buff, handle_remove_buff, \
     handle_change_max_speed
 from entity import handle_entity_full_update
@@ -258,7 +258,7 @@ def handle_client(session: ClientSession):
             elif pkt == 0x0D:
                handle_entity_destroy(session, data, all_sessions)
             elif pkt == 0x79:
-               PKTTYPE_BUFF_TICK_DOT(session, data, all_sessions)
+               handle_buff_tick_dot(session, data, all_sessions)
             elif pkt == 0x82:
                handle_respawn_broadcast(session, data, all_sessions)
             elif pkt == 0x77:
