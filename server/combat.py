@@ -165,35 +165,21 @@ def handle_power_hit(session, data, all_sessions):
             other.conn.sendall(data)
 
 def handle_projectile_explode(session, data, all_sessions):
-    payload = data[4:]
-    br = BitReader(payload, debug=False)
-    try:
-        entity_id       = br.read_method_9()
-        remote_missile  = br.read_method_9()
-        x = br.read_method_24()
-        y = br.read_method_24()
-        flag = bool(br.read_method_15())
-        props = {
-            'entity_id':      entity_id,
-            'remote_missile': remote_missile,
-            'x':              x,
-            'y':              y,
-            'flag':           flag,
-        }
-        #print(f"[{session.addr}] [PKT0E] Parsed projectile-explode:")
-        #pprint.pprint(props, indent=4)
+    br = BitReader(data[4:])
+    entity_id      = br.read_method_9()
+    remote_missile = br.read_method_9()
+    coordinate_x   = br.read_method_24()
+    coordinate_y   = br.read_method_24()
+    is_crit        = br.read_method_15()
 
-        for other in all_sessions:
-            if (other is not session
-                and other.world_loaded
-                and other.current_level == session.current_level):
-                other.conn.sendall(data)
-
-    except Exception as e:
-        print(f"[{session.addr}] [PKT0E] Error parsing projectile explode: {e}, raw={payload.hex()}")
-        if br.debug:
-            for line in br.get_debug_log():
-                print(line)
+    # Broadcast unchanged packet to all other players in same level
+    for other in all_sessions:
+        if (
+            other is not session
+            and other.world_loaded
+            and other.current_level == session.current_level
+        ):
+            other.conn.sendall(data)
 
 def handle_add_buff(session, data, all_sessions):
     payload = data[4:]
