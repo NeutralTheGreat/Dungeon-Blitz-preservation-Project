@@ -67,7 +67,7 @@ def handle_buff_tick_dot(session, data, all_sessions):
     source_id = br.read_method_9()
     power_type_id = br.read_method_9()
     amount = br.read_method_24()
-    
+
     # Broadcast unchanged packet to other players in same level
     for other in all_sessions:
         if (
@@ -198,50 +198,31 @@ def handle_grant_reward(session, data, all_sessions):
                 other.conn.sendall(pkt)
 
 def handle_power_hit(session, data, all_sessions):
-    payload = data[4:]
-    br = BitReader(payload, debug=False)
-    try:
-        target_id = br.read_method_9()
-        source_id = br.read_method_9()
+    br = BitReader(data[4:])
+    target_entity_id = br.read_method_9()
+    source_entity_id = br.read_method_9()
+    damage_value     = br.read_method_24()
+    power_type_id    = br.read_method_9()
 
-        # 3) Read damage/effect value
-        value     = br.read_method_24()
-        power_id  = br.read_method_9()
+    # Animation override
+    has_animation_override = br.read_method_15()
+    animation_override_id = br.read_method_9() if has_animation_override  else None
 
-        # 5) Optional param5 (var-int)
-        has_p5    = bool(br.read_method_15())
-        param5    = br.read_method_9() if has_p5 else 0
+    # Hit effect override (projectile/effect index)
+    has_effect_override = br.read_method_15()
+    effect_override_id = br.read_method_9() if has_effect_override else None
 
-        # 6) Optional param6 (var-int)
-        has_p6    = bool(br.read_method_15())
-        param6    = br.read_method_9() if has_p6 else 0
+    # Critical hit or special-flag
+    is_critical = br.read_method_15()
 
-        # 7) Final boolean flag (crit? or similar)
-        param7    = bool(br.read_method_15())
-
-        props = {
-            'target_id': target_id,
-            'source_id': source_id,
-            'value':      value,
-            'power_id':   power_id,
-            'param5':     param5 if has_p5 else None,
-            'param6':     param6 if has_p6 else None,
-            'flag':       param7,
-        }
-        #print(f"[{session.addr}] [PKT0A] Parsed power-hit:")
-        #pprint.pprint(props, indent=4)
-
-        for other in all_sessions:
-            if (other is not session
+    # Forward packet unchanged to other clients in same level
+    for other in all_sessions:
+        if (
+                other is not session
                 and other.world_loaded
-                and other.current_level == session.current_level):
-                other.conn.sendall(data)
-
-    except Exception as e:
-        print(f"[{session.addr}] [PKT0A] Error parsing power-hit: {e}, raw={payload.hex()}")
-        if br.debug:
-            for line in br.get_debug_log():
-                print(line)
+                and other.current_level == session.current_level
+        ):
+            other.conn.sendall(data)
 
 def handle_projectile_explode(session, data, all_sessions):
     payload = data[4:]
