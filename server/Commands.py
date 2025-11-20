@@ -724,21 +724,6 @@ def handle_private_message(session, data, all_sessions):
     except Exception as e:
         print(f"[{session.addr}] [PKT46] Parse error: {e}, raw payload = {payload.hex()}")
 
-def Client_Crash_Reports(session, data):
-    """
-    Read a CLIENT ERROR (0x7C) packet and log it.
-    No response is sent back.
-    """
-    # unpack the two‐byte packet ID and two‐byte length
-    _, length = struct.unpack_from(">HH", data, 0)
-    # extract exactly `length` bytes of payload
-    payload = data[4:4 + length]
-    try:
-        msg = payload.decode("utf-8", errors="replace")
-    except Exception:
-        msg = repr(payload)
-    print(f"[{session.addr}] CLIENT ERROR (0x7C): {msg}")
-
 
 def handle_hp_increase_notice(session, data):
        pass

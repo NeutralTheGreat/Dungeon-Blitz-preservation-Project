@@ -11,7 +11,7 @@ from Commands import  handle_gear_packet, \
     handle_apply_gearset, handle_update_equipment, handle_private_message, \
     handle_public_chat, handle_group_invite, handle_entity_incremental_update, PaperDoll_Request, handle_hp_increase_notice, handle_volume_enter, \
     handle_change_offset_y, handle_start_skit, handle_lockbox_reward, handle_linkupdater, \
-    handle_emote_begin, Client_Crash_Reports, handle_mount_equip_packet, handle_pet_info_packet, \
+    handle_emote_begin, handle_mount_equip_packet, handle_pet_info_packet, \
     handle_collect_hatched_egg, handle_talk_to_npc, handle_char_regen, handle_request_armory_gears
 from talent import handle_respec_talent_tree, handle_allocate_talent_tree_points, handle_talent_claim, \
     handle_talent_speedup, \
@@ -28,7 +28,7 @@ from combat import handle_entity_destroy, handle_buff_tick_dot, handle_respawn_b
     handle_change_max_speed, handle_power_cast
 from entity import handle_entity_full_update
 from globals import level_registry, session_by_token, all_sessions, char_tokens, token_char, extended_sent_map, HOST, \
-    PORTS
+    PORTS, Client_Crash_Reports
 from level_config import handle_open_door, handle_level_transfer_request, handle_request_door_state, LEVEL_CONFIG
 from login import handle_login_version, handle_login_create, handle_login_authenticate, handle_login_character_create, \
     handle_character_select, handle_gameserver_login
