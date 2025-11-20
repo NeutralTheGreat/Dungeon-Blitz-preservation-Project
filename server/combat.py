@@ -228,34 +228,33 @@ def handle_add_buff(session, data, all_sessions):
         ):
             other.conn.sendall(data)
 
+"""
+TODO:
+    The server does NOT currently track buff timers or stacks.
+    For server-spawned entities, buffs never expire unless the
+    server sends this packet. In the future, the server must
+    store:
+        • buff_type_id
+        • instance_id
+        • duration
+        • stack count
+        • start time
+    so it can send timed buff removals correctly.
+"""
 def handle_remove_buff(session, data, all_sessions):
-    payload = data[4:]
-    br = BitReader(payload, debug=False)
-    try:
-        entity_id   = br.read_method_9()
-        buff_type   = br.read_method_9()
-        instance_id = br.read_method_9()
+    br = BitReader(data[4:])
+    entity_id      = br.read_method_9()
+    buff_type_id   = br.read_method_9()
+    instance_id    = br.read_method_9()
 
-        props = {
-            'entity_id':   entity_id,
-            'buff_type':   buff_type,
-            'instance_id': instance_id,
-        }
-        #print(f"[{session.addr}] [PKT0C] Parsed remove-buff:")
-        #pprint.pprint(props, indent=4)
-
-        for other in all_sessions:
-            if (other is not session
-                and other.world_loaded
-                and other.current_level == session.current_level):
-                other.conn.sendall(data)
-                print(f"[{session.addr}] [PKT0C] Broadcasted to {other.addr}")
-
-    except Exception as e:
-        print(f"[{session.addr}] [PKT0C] Error parsing remove-buff: {e}, raw={payload.hex()}")
-        if br.debug:
-            for line in br.get_debug_log():
-                print(line)
+    # Broadcast packet unchanged to other players in the same level
+    for other in all_sessions:
+        if (
+            other is not session
+            and other.world_loaded
+            and other.current_level == session.current_level
+        ):
+            other.conn.sendall(data)
 
 def handle_change_max_speed(session, data, all_sessions):
     payload = data[4:]
