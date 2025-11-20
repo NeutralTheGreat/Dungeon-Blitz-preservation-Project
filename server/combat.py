@@ -137,66 +137,6 @@ def handle_request_respawn(session, data):
 
     session.conn.sendall(struct.pack(">HH", 0x80, len(payload)) + payload)
 
-def handle_grant_reward(session, data, all_sessions):
-    payload = data[4:]
-    br = BitReader(payload, debug=True)
-    try:
-        grantor_id    = br.read_method_9()
-        target_id     = br.read_method_9()
-
-        flag_showXP   = bool(br.read_method_15())
-        xp_rate       = br.read_float()
-
-        flag_showGold = bool(br.read_method_15())
-        gold_rate     = br.read_float()
-
-        flag_showHeal = bool(br.read_method_15())
-        flag_showMana = bool(br.read_method_15())
-
-        code_xpType   = br.read_method_9()
-        code_goldType = br.read_method_9()
-        code_manaType = br.read_method_9()
-        code_healType = br.read_method_9()
-
-        # **NOW** read the drop coordinates:
-        drop_x = br.read_method_24()   # signed 24-bit
-        drop_y = br.read_method_24()   # signed 24-bit
-
-        has_extra     = bool(br.read_method_15())
-        extra_id      = br.read_method_9() if has_extra else None
-
-    except Exception as e:
-        print("…parsing error…")
-        return
-
-    # now build loot_drops using the true drop_x, drop_y:
-    loot_drops = []
-    if flag_showXP:
-        loot_drops.append(('xp', code_xpType, int(xp_rate)))
-    if flag_showGold:
-        loot_drops.append(('gold', code_goldType, int(gold_rate)))
-    if flag_showHeal:
-        loot_drops.append(('healing', code_healType, 0))
-    if flag_showMana:
-        loot_drops.append(('mana', code_manaType, 0))
-    if extra_id:
-        # the client expects two fixed‐width values for gear:
-        loot_drops.append(('gear', extra_id, extra_id))
-
-    # broadcast one 0x32 per drop:
-    for rtype, v1, v2 in loot_drops:
-        pkt = build_loot_drop_packet(
-            entity_id=target_id,
-            x=drop_x,
-            y=drop_y,
-            reward_type=rtype,
-            value1=v1,
-            value2=v2
-        )
-        for other in all_sessions:
-            if other.world_loaded and other.current_level == session.current_level:
-                other.conn.sendall(pkt)
-
 def handle_power_hit(session, data, all_sessions):
     br = BitReader(data[4:])
     target_entity_id = br.read_method_9()
@@ -360,3 +300,65 @@ def handle_change_max_speed(session, data, all_sessions):
     for other_session in all_sessions:
         if other_session.world_loaded and other_session.current_level == session.current_level:
             other_session.conn.sendall(packet)
+
+
+
+def handle_grant_reward(session, data, all_sessions):
+    payload = data[4:]
+    br = BitReader(payload, debug=True)
+    try:
+        grantor_id    = br.read_method_9()
+        target_id     = br.read_method_9()
+
+        flag_showXP   = bool(br.read_method_15())
+        xp_rate       = br.read_float()
+
+        flag_showGold = bool(br.read_method_15())
+        gold_rate     = br.read_float()
+
+        flag_showHeal = bool(br.read_method_15())
+        flag_showMana = bool(br.read_method_15())
+
+        code_xpType   = br.read_method_9()
+        code_goldType = br.read_method_9()
+        code_manaType = br.read_method_9()
+        code_healType = br.read_method_9()
+
+        # **NOW** read the drop coordinates:
+        drop_x = br.read_method_24()   # signed 24-bit
+        drop_y = br.read_method_24()   # signed 24-bit
+
+        has_extra     = bool(br.read_method_15())
+        extra_id      = br.read_method_9() if has_extra else None
+
+    except Exception as e:
+        print("…parsing error…")
+        return
+
+    # now build loot_drops using the true drop_x, drop_y:
+    loot_drops = []
+    if flag_showXP:
+        loot_drops.append(('xp', code_xpType, int(xp_rate)))
+    if flag_showGold:
+        loot_drops.append(('gold', code_goldType, int(gold_rate)))
+    if flag_showHeal:
+        loot_drops.append(('healing', code_healType, 0))
+    if flag_showMana:
+        loot_drops.append(('mana', code_manaType, 0))
+    if extra_id:
+        # the client expects two fixed‐width values for gear:
+        loot_drops.append(('gear', extra_id, extra_id))
+
+    # broadcast one 0x32 per drop:
+    for rtype, v1, v2 in loot_drops:
+        pkt = build_loot_drop_packet(
+            entity_id=target_id,
+            x=drop_x,
+            y=drop_y,
+            reward_type=rtype,
+            value1=v1,
+            value2=v2
+        )
+        for other in all_sessions:
+            if other.world_loaded and other.current_level == session.current_level:
+                other.conn.sendall(pkt)
