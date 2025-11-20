@@ -5,7 +5,7 @@ from BitBuffer import BitBuffer
 from Character import save_characters
 from Commands import build_loot_drop_packet
 from bitreader import BitReader
-from constants import LinkUpdater, Entity
+from constants import LinkUpdater, Entity, PowerType
 from globals import send_consumable_update
 from level_config import SPAWN_POINTS
 
@@ -326,3 +326,75 @@ def handle_grant_reward(session, data, all_sessions):
         for other in all_sessions:
             if other.world_loaded and other.current_level == session.current_level:
                 other.conn.sendall(pkt)
+
+def handle_power_cast(session, data, all_sessions):
+
+    payload = data[4:]
+    br = BitReader(payload, debug=False)
+
+    try:
+        ent_id   = br.read_method_9()
+        power_id = br.read_method_9()
+
+        # ← CORRECTED TARGET‐POINT HANDSHAKE
+        _ = br.read_method_15()                        # discard hasTargetEntity
+        has_target_pos = bool(br.read_method_15())     # var_2846: does this power type support coords?
+        target_pt = None
+        if has_target_pos:
+            target_x = br.read_method_24()
+            target_y = br.read_method_24()
+            target_pt = (target_x, target_y)
+
+        # projectile
+        has_proj = bool(br.read_method_15())
+        proj_id  = br.read_method_9() if has_proj else None
+
+        # charged flag
+        is_charged = bool(br.read_method_15())
+
+        # melee‐combo / var_674 branch
+        has_extra = bool(br.read_method_15())
+        secondary_id = tertiary_id = None
+        if has_extra:
+            is_secondary = bool(br.read_method_15())
+            if is_secondary:
+                secondary_id = br.read_method_9()
+            else:
+                tertiary_id = br.read_method_9()
+
+        # cooldown & mana
+        has_flags = bool(br.read_method_15())
+        cooldown_tick = mana_cost = None
+        if has_flags:
+            if bool(br.read_method_15()):
+                cooldown_tick = br.read_method_9()
+            if bool(br.read_method_15()):
+                MANA_BITS = PowerType.const_423
+                mana_cost = br.read_method_6(MANA_BITS)
+
+        props = {
+            #'caster_ent_id': ent_id,
+            'power_id':      power_id,
+            #'target_pt':     target_pt,
+            #'projectile_id': proj_id,
+            #'is_charged':    is_charged,
+            #'secondary_id':  secondary_id,
+            #'tertiary_id':   tertiary_id,
+            #'cooldown_tick': cooldown_tick,
+            #'mana_cost':     mana_cost,
+        }
+        #print(f"[{session.addr}] [PKT09] Parsed power-cast:")
+        #pprint.pprint(props, indent=4)
+
+        # broadcast to peers
+        for other in all_sessions:
+            if (other is not session
+                and other.world_loaded
+                and other.current_level == session.current_level):
+                other.conn.sendall(data)
+
+    except Exception as e:
+        print(f"[{session.addr}] [PKT09] Error parsing power-cast: {e}")
+        if br.debug:
+            for line in br.get_debug_log():
+                print(line)
