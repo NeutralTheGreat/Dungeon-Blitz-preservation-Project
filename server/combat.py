@@ -257,35 +257,15 @@ def handle_remove_buff(session, data, all_sessions):
             other.conn.sendall(data)
 
 def handle_change_max_speed(session, data, all_sessions):
-    payload = data[4:]
-    br = BitReader(payload, debug=True)
-
-    try:
-        entity_id = br.read_method_4()
-        speed_mod_int = br.read_method_4()
-    except Exception as e:
-        return
-
-    # Find the entity
-    entity = session.entities.get(entity_id)
-    if not entity:
-        #print(f"[{session.addr}] [PKT0x8A] Entity {entity_id} not found")
-        return
-
-    # Update the entity's behaviorSpeedMod
-    entity['behaviorSpeedMod'] = speed_mod_int * LinkUpdater.VELOCITY_DEFLATE
-    #print(f"[{session.addr}] [PKT0x8A] Updated entity {entity_id} behaviorSpeedMod to {entity['behaviorSpeedMod']}")
-
-    bb = BitBuffer()
-    bb.write_method_4(entity_id)
-    bb.write_method_4(speed_mod_int)  # Send the original integer value
-    payload = bb.to_bytes()
-    packet = struct.pack(">HH", 0x8A, len(payload)) + payload
-    for other_session in all_sessions:
-        if other_session.world_loaded and other_session.current_level == session.current_level:
-            other_session.conn.sendall(packet)
-
-
+    br = BitReader(data[4:])
+    entity_id     = br.read_method_9()
+    speed_mod_int = br.read_method_9()
+    for other in all_sessions:
+        if (
+            other.world_loaded
+            and other.current_level == session.current_level
+        ):
+            other.conn.sendall(data)
 
 def handle_grant_reward(session, data, all_sessions):
     payload = data[4:]
