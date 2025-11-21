@@ -61,35 +61,39 @@ def handle_login_create(session, data, conn):
     print(f"[{session.addr}] [0x13] Login/Create OK for {email} → {len(session.char_list)} characters")
 
 def handle_login_authenticate(session, data, conn):
-    br = BitReader(data[4:], debug=True)
-    try:
-        client_facebook_id = br.read_method_26()
-        client_kongregate_id = br.read_method_26()
-        email = br.read_method_26().strip().lower()
-        encrypted_password = br.read_method_26()
-        legacy_auth_key = br.read_method_26()
-    except Exception as e:
-        print(f"[{session.addr}] [0x14] Error parsing packet: {e}, raw={data.hex()}")
-        return
+    br = BitReader(data[4:])
+    client_facebook_id = br.read_method_26()
+    client_kongregate_id = br.read_method_26()
+    email = br.read_method_26().strip().lower()
+    encrypted_password = br.read_method_26()
+    legacy_auth_key = br.read_method_26()
+
     accounts = load_accounts()
     user_id = accounts.get(email)
+
     if not user_id:
         conn.sendall(build_popup_packet("Account not found", disconnect=True))
-        print(f"[{session.addr}] [0x14] Login failed — account not found for {email}")
+        print(f"[{session.addr}] [0x14] Login failed — no account for {email}")
         return
+
     session.user_id = user_id
     save_path = os.path.join(_SAVES_DIR, f"{user_id}.json")
-    try:
+
+    if os.path.exists(save_path):
         with open(save_path, "r", encoding="utf-8") as f:
             session.player_data = json.load(f)
-    except FileNotFoundError:
-        print(f"[{session.addr}] [0x14] Missing save for user {user_id}, creating blank save.")
+    else:
+        print(f"[{session.addr}] [0x14] No save file for user {user_id}, creating blank save.")
         session.player_data = {"email": email, "characters": []}
+
     session.char_list = session.player_data.get("characters", [])
     session.authenticated = True
-    packet = build_login_character_list_bitpacked(session.char_list)
-    conn.sendall(packet)
+
+    pkt = build_login_character_list_bitpacked(session.char_list)
+    conn.sendall(pkt)
+
     print(f"[{session.addr}] [0x14] Login success for {email} → user_id={user_id}, {len(session.char_list)} chars")
+
 
 def handle_login_character_create(session, data, conn):
     br = BitReader(data[4:])
