@@ -6,7 +6,7 @@ import secrets
 import struct
 import time
 
-from Character import load_characters, build_login_character_list_bitpacked, load_class_template, save_characters
+from Character import load_characters, build_login_character_list_bitpacked, load_class_template
 from WorldEnter import build_enter_world_packet, Player_Data_Packet
 from accounts import get_or_create_user_id, load_accounts, build_popup_packet, _SAVES_DIR, is_character_name_taken
 from ai_logic import AI_ENABLED, ensure_ai_loop, run_ai_loop
@@ -235,63 +235,46 @@ def handle_character_select(session, data, conn):
         print(f"[{session.addr}] [0x16] Transfer begin: {name}, tk={tk}, level={current_level}")
 
 def handle_gameserver_login(session, data, conn):
-    token = int.from_bytes(data[4:], 'big')
+    br = BitReader(data[4:])
+    token        = br.read_method_9()
+    extra_string = br.read_method_26()
+    extra_flag   = br.read_method_15()
 
-    entry = used_tokens.get(token) or pending_world.get(token)
+    entry = pending_world.get(token)
     if entry is None:
-        if len(pending_world) == 1:
-            token, entry = next(iter(pending_world.items()))
-        else:
-            s = session_by_token.get(token)
-            if s:
-                entry = (
-                    getattr(s, "current_char_dict", None)
-                    or {"name": s.current_character},
-                    s.current_level,
-                )
-
-    if not entry:
-        print(f"[{session.addr}] Error: No entry found for token {token}, pending_world size={len(pending_world)}")
+        print(f"[{session.addr}] Invalid token {token}, pending_world size={len(pending_world)}")
         return
 
-    # entry may be (char, target_level) or (char, target_level, previous_level)
-    if len(entry) == 2:
-        char, target_level = entry
-        previous_level = session.current_level or char.get("PreviousLevel", {}).get("name", "NewbieRoad")
-    else:
-        char, target_level, previous_level = entry
-        if isinstance(previous_level, dict):
-            previous_level = previous_level.get("name", "NewbieRoad")
+    # expect (char, target_level, previous_level)
+    char, target_level, previous_level = entry
 
-    if char is None:
-        print(f"[{session.addr}] Error: Character is None for token {token}")
-        return
+    # Resolve user_id from token_char if needed
+    if not session.user_id:
+        key = token_char.get(token)
+        if not key:
+            print(f"[{session.addr}] Warning: could not resolve user_id for token {token}")
+            return
+        session.user_id = key[0]
 
-    # Determine dungeon entry
+    session.current_character = char["name"]
+    session.current_char_dict = char
+    session.current_level     = target_level
+
+    # Dungeon entry level
     is_dungeon = LEVEL_CONFIG.get(target_level, (None, None, None, False))[3]
     session.entry_level = previous_level if is_dungeon else None
 
-    # user_id already known from authentication
-    if not session.user_id:
-        key = token_char.get(token)
-        if key:
-            uid, char_name = key
-            session.user_id = uid
-            session.current_character = char_name
-            print(f"[{session.addr}] Restored user_id from token: {uid}")
-        else:
-            print(f"[{session.addr}] Warning: could not resolve user_id for token {token}")
-            return
+    session.clientEntID   = token
+    session.authenticated = True
+    current_characters[session.user_id] = session.current_character
 
-    # Update character list in save
+    # Save/update character list
     session.char_list = load_characters(session.user_id)
-    updated = False
     for i, c in enumerate(session.char_list):
         if c["name"] == char["name"]:
             session.char_list[i] = char
-            updated = True
             break
-    if not updated:
+    else:
         session.char_list.append(char)
 
     session.player_data["characters"] = session.char_list
@@ -300,18 +283,15 @@ def handle_gameserver_login(session, data, conn):
         json.dump(session.player_data, f, indent=2)
 
     pending_world.pop(token, None)
-    session.current_level = target_level
-    session.current_character = char["name"]
-    session.current_char_dict = char
-    current_characters[session.user_id] = session.current_character
-    session.authenticated = True
 
-    used_tokens[token] = (char, target_level, previous_level)
-
+    # Spawn point
     new_x, new_y, new_has_coord = get_spawn_coordinates(char, previous_level, target_level)
 
-    user_id = session.user_id
-    send_ext = not extended_sent_map.get(user_id, {}).get("sent", False)
+    # Store token mapping (needed by client for entType etc.)
+    used_tokens[token] = (char, target_level, previous_level)
+
+    # Build and send Player_Data
+    send_ext = not extended_sent_map.get(session.user_id, {}).get("sent", False)
     welcome = Player_Data_Packet(
         char,
         transfer_token=token,
@@ -321,9 +301,8 @@ def handle_gameserver_login(session, data, conn):
         new_has_coord=new_has_coord,
         send_extended=send_ext,
     )
-    extended_sent_map[user_id] = {"sent": True, "last_seen": time.time()}
+    extended_sent_map[session.user_id] = {"sent": True, "last_seen": time.time()}
     conn.sendall(welcome)
-    session.clientEntID = token
 
     print(f"[{session.addr}] Welcome: {char['name']} (token {token})")
 
@@ -334,11 +313,8 @@ def handle_gameserver_login(session, data, conn):
         print(f"[AI] Skipping loop for level {session.current_level} (AI disabled)")
 
     for npc in npcs.values():
-        try:
-            payload = Send_Entity_Data(npc)
-            conn.sendall(struct.pack(">HH", 0x0F, len(payload)) + payload)
-            session.entities[npc["id"]] = npc
-        except Exception as e:
-            print(f"[{session.addr}] Error sending NPC {npc['id']} to {session.current_level}: {e}")
+        payload = Send_Entity_Data(npc)
+        conn.sendall(struct.pack(">HH", 0x0F, len(payload)) + payload)
+        session.entities[npc["id"]] = npc
 
     print(f"[{session.addr}] NPCs synced for level {session.current_level}")
