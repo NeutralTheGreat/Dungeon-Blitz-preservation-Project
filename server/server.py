@@ -9,7 +9,7 @@ from Character import save_characters
 from Commands import  handle_gear_packet, \
     handle_apply_dyes, handle_equip_rune, handle_change_look, handle_create_gearset, handle_name_gearset, \
     handle_apply_gearset, handle_update_equipment, handle_private_message, \
-    handle_public_chat, handle_group_invite, handle_entity_incremental_update, PaperDoll_Request, handle_hp_increase_notice, handle_volume_enter, \
+    handle_public_chat, handle_group_invite, PaperDoll_Request, handle_hp_increase_notice, handle_volume_enter, \
     handle_change_offset_y, handle_start_skit, handle_lockbox_reward, handle_linkupdater, \
     handle_emote_begin, handle_mount_equip_packet, handle_pet_info_packet, \
     handle_collect_hatched_egg, handle_talk_to_npc, handle_char_regen, handle_request_armory_gears
@@ -29,7 +29,8 @@ from combat import handle_entity_destroy, handle_buff_tick_dot, handle_respawn_b
 from entity import handle_entity_full_update
 from globals import level_registry, session_by_token, all_sessions, char_tokens, token_char, extended_sent_map, HOST, \
     PORTS, Client_Crash_Reports
-from level_config import handle_open_door, handle_level_transfer_request, handle_request_door_state, LEVEL_CONFIG
+from level_config import handle_open_door, handle_level_transfer_request, handle_request_door_state, LEVEL_CONFIG, \
+    handle_entity_incremental_update
 from login import handle_login_version, handle_login_create, handle_login_authenticate, handle_login_character_create, \
     handle_character_select, handle_gameserver_login
 from scheduler import set_active_session_resolver
@@ -110,34 +111,38 @@ class ClientSession:
         return tk
 
     def save_player_position(self):
-        """Save player position if not in a dungeon or if in CraftTown."""
-        try:
-            if not (self.user_id and self.char_list and self.current_character):
-                return
+        if not (self.user_id and self.char_list and self.current_character):
+            return
 
-            for char in self.char_list:
-                if char.get("name") == self.current_character:
-                    current_level = getattr(self, "current_level", None)
-                    ent = self.entities.get(self.clientEntID, {})
+        char = next((c for c in self.char_list if c.get("name") == self.current_character), None)
+        if not char:
+            return
 
-                    if current_level and ent:
-                        # check dungeon flag
-                        is_dungeon = LEVEL_CONFIG.get(current_level, (None, None, None, False))[3]
-                        if not is_dungeon or current_level == "CraftTown":
-                            char["CurrentLevel"] = {
-                                "name": current_level,
-                                "x": ent.get("pos_x", 0),
-                                "y": ent.get("pos_y", 0),
-                            }
-                            save_characters(self.user_id, self.char_list)
-                            print(
-                                f"[{self.addr}] Saved character {self.current_character}: "
-                                f"{char.get('CurrentLevel', {})}"
-                            )
-                    break
+        current_level = self.current_level
+        ent = self.entities.get(self.clientEntID)
 
-        except Exception as e:
-            print(f"[{self.addr}] Error saving player position: {e}")
+        if not (current_level and ent):
+            return
+
+        # Determine whether saving is allowed
+        is_dungeon = LEVEL_CONFIG.get(current_level, ("", 0, 0, False))[3]
+        allow_save = (current_level == "CraftTown") or not is_dungeon
+
+        if not allow_save:
+            print(f"[{self.addr}] Skipping position save (in dungeon): {current_level}")
+            return
+
+        # ONLY update coords, never the level name here
+        char["CurrentLevel"]["x"] = ent.get("pos_x", 0)
+        char["CurrentLevel"]["y"] = ent.get("pos_y", 0)
+
+        save_characters(self.user_id, self.char_list)
+
+        print(
+            f"[{self.addr}] Saved player position: "
+            f"{char['CurrentLevel']['name']} → "
+            f"({char['CurrentLevel']['x']}, {char['CurrentLevel']['y']})"
+        )
 
     def close_connection(self):
         try:
@@ -145,10 +150,7 @@ class ClientSession:
         except:
             pass
 
-        try:
-            self.save_player_position()  # replaces old coordinate-saving logic
-        except Exception as e:
-            print(f"[{self.addr}] Error saving on disconnect: {e}")
+        self.save_player_position()
 
         s = session_by_token.get(self.clientEntID)
         if s:

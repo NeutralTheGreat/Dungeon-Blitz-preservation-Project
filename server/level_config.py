@@ -1,4 +1,3 @@
-import json
 import os
 import struct
 
@@ -7,24 +6,42 @@ from BitBuffer import BitBuffer
 from Character import load_characters, save_characters
 from WorldEnter import build_enter_world_packet
 from bitreader import BitReader
-from constants import door, class_119
-from globals import used_tokens, pending_world, session_by_token, token_char
+from constants import door, class_119, Entity, _load_json
+from globals import used_tokens, pending_world, session_by_token, token_char, level_players
 
+# witness the spaghetti code  down below :)
 
-# --- Adjust target_level based on the two special mission doors ---
 def resolve_special_mission_doors(char: dict, current_level: str, target_level: str) -> str:
-    missions = char.get("Missions", {})
-    # Case 1: SwampRoadNorth -> SwampRoadConnectionMission (Mission 23)
+    missions = char.get("missions", {})
+
+    def get_state(mid):
+        m = missions.get(str(mid))
+        return m.get("state", 0) if m else 0
+
     if current_level == "SwampRoadNorth" and target_level == "SwampRoadConnectionMission":
-        state = missions.get("23", {}).get("state", 0)
-        if state == 2:
+        if get_state(23) == 2:
             return "SwampRoadConnection"
-    # Case 2: BridgeTown -> AC_Mission1 (Mission 92)
+
+    if current_level == "BridgeTown" and target_level == "SwampRoadConnectionMission":
+        if get_state(23) == 2:
+            return "SwampRoadConnection"
+
     if current_level == "BridgeTown" and target_level == "AC_Mission1":
-        state = missions.get("92", {}).get("state", 0)
-        if state == 2:
+        if get_state(92) == 2:
             return "Castle"
-    # default: no change
+
+    if current_level == "BridgeTownHard" and target_level == "AC_Mission1Hard":
+        if get_state(199) == 2:
+            return "CastleHard"
+
+    if current_level == "ShazariDesert" and target_level == "JC_Mission1":
+        if get_state(223) == 2:
+            return "JadeCity"
+
+    if current_level == "ShazariDesertHard" and target_level == "JC_Mission1Hard":
+        if get_state(199) == 2:
+            return "JadeCityHard"
+
     return target_level
 
 SPECIAL_SPAWN_MAP = {
@@ -50,32 +67,29 @@ SPECIAL_SPAWN_MAP = {
     ("JadeCityHard", "ShazariDesertHard"): (25857.25, 1298.4691666666668),
 }
 
-def get_spawn_coordinates(char: dict, current_level: str, target_level: str) -> tuple[float, float, bool]:
-    # 1. Handle special transitions first
-    if coords := SPECIAL_SPAWN_MAP.get((current_level, target_level)):
-        x, y = coords
-        return int(round(x)), int(round(y)), True
+def get_spawn_coordinates(char: dict, current_level: str, target_level: str) -> tuple[int, int, bool]:
+    # Special transition overrides
+    coords = SPECIAL_SPAWN_MAP.get((current_level, target_level))
+    if coords:
+        return int(coords[0]), int(coords[1]), True
 
-    # 2. Detect dungeon flag
-    is_dungeon = LEVEL_CONFIG.get(target_level, (None, None, None, False))[3]
-    # skip dungeon spawns except CraftTown
-    if is_dungeon and target_level != "CraftTown":
+    # Dungeons -> let client use default spawn
+    if is_dungeon_level(target_level):
         return 0, 0, False
 
-    # 3. Default spawn point for the target level
-    spawn = SPAWN_POINTS.get(target_level, {"x": 0.0, "y": 0.0})
+    # Saved re-entry into same normal zone
+    curr = char.get("CurrentLevel", {})
+    if curr.get("name") == target_level and "x" in curr and "y" in curr:
+        return int(curr["x"]), int(curr["y"]), True
 
-    # 4. Use coordinates from current or previous save entries if available
-    current_level_data = char.get("CurrentLevel", {})
-    prev_level_data = char.get("PreviousLevel", {})
+    # Returning to previous normal zone
+    prev = char.get("PreviousLevel", {})
+    if prev.get("name") == target_level and "x" in prev and "y" in prev:
+        return int(prev["x"]), int(prev["y"]), True
 
-    if (target_level == current_level_data.get("name")) and "x" in current_level_data and "y" in current_level_data:
-        return int(round(current_level_data["x"])), int(round(current_level_data["y"])), True
-    elif prev_level_data.get("name") == target_level and "x" in prev_level_data and "y" in prev_level_data:
-        return int(round(prev_level_data["x"])), int(round(prev_level_data["y"])), True
-
-    # 5. Fallback to static spawn point
-    return int(round(spawn["x"])), int(round(spawn["y"])), True
+    # Static spawn for normal zones
+    sp = SPAWN_POINTS.get(target_level, {"x": 0.0, "y": 0.0})
+    return int(sp["x"]), int(sp["y"]), True
 
 SPAWN_POINTS = {
     "CraftTown":{"x": 360, "y": 1458.99},
@@ -109,197 +123,266 @@ SPAWN_POINTS = {
 }
 
 DATA_DIR = "data"
-def _load_json(path, default):
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"[level_config] {os.path.basename(path)} load failed: {e}")
-        return default
-# --- Load base definitions ---
+
 _raw_level_config = _load_json(os.path.join(DATA_DIR, "level_config.json"), {})
-_door_list = _load_json(os.path.join(DATA_DIR, "door_map.json"), [])
+_door_list        = _load_json(os.path.join(DATA_DIR, "door_map.json"), [])
+
 DOOR_MAP = {tuple(k): v for k, v in _door_list if isinstance(k, list) and len(k) == 2}
-# --- Build LEVEL_CONFIG from _raw_level_config ---
+
 LEVEL_CONFIG = {
     name: (p[0], int(p[1]), int(p[2]), p[3].lower() == "true")
     for name, spec in _raw_level_config.items()
-    if (p := spec.split()) and len(p) >= 4 and p[0]
+    if (p := spec.split()) and len(p) >= 4
 }
-#print(f"[level_config] Loaded {len(LEVEL_CONFIG)} levels, {len(DOOR_MAP)} doors")
+
+def is_dungeon_level(level_name: str) -> bool:
+    if not level_name:
+        return False
+    return LEVEL_CONFIG.get(level_name, ("", 0, 0, False))[3]
+
+def is_save_allowed_level(level_name: str) -> bool:
+    """
+    True for normal zones + CraftTown (home)
+    False for dungeons
+    """
+    if not level_name:
+        return False
+    if level_name == "CraftTown":
+        return True
+    return not is_dungeon_level(level_name)
+
+def update_saved_levels_on_transfer(char: dict, old_level: str, new_level: str,new_x: float, new_y: float) -> None:
+    """
+    Update char["CurrentLevel"] and char["PreviousLevel"] when changing levels.
+
+    Rules:
+      - Never save dungeon levels.
+      - CraftTown is a special hub:
+          CurrentLevel  = CraftTown
+          PreviousLevel = last non-dungeon zone
+      - Normal zone:
+          PreviousLevel = previous safe CurrentLevel
+          CurrentLevel  = new zone
+    """
+
+    if not new_level or not is_save_allowed_level(new_level):
+        # New level is a dungeon (and not CraftTown) do not change saves.
+        return
+
+    curr = char.get("CurrentLevel") or {}
+    prev = char.get("PreviousLevel") or {}
+
+    curr_name = curr.get("name")
+    prev_name = prev.get("name")
+
+    # Helper to copy a record safely
+    def copy_level_rec(src: dict) -> dict:
+        if not src:
+            return {}
+        return {
+            "name": src.get("name"),
+            "x": src.get("x", 0),
+            "y": src.get("y", 0),
+        }
+
+    # --- CraftTown special case (home) ---
+    if new_level == "CraftTown":
+        # Pick the last safe zone we were "coming from"
+        # Prefer CurrentLevel if it’s a safe non-CraftTown
+        safe_from = None
+        if curr_name and is_save_allowed_level(curr_name) and curr_name != "CraftTown":
+            safe_from = curr
+        elif prev_name and is_save_allowed_level(prev_name) and prev_name != "CraftTown":
+            safe_from = prev
+
+        if safe_from:
+            char["PreviousLevel"] = copy_level_rec(safe_from)
+
+        char["CurrentLevel"] = {
+            "name": "CraftTown",
+            "x": int(round(new_x)),
+            "y": int(round(new_y)),
+        }
+        return
+
+    # --- Normal overworld / town zone (non-dungeon) ---
+    # Shift old safe CurrentLevel into PreviousLevel
+    if curr_name and is_save_allowed_level(curr_name) and curr_name != new_level:
+        char["PreviousLevel"] = copy_level_rec(curr)
+
+    # Set new CurrentLevel
+    char["CurrentLevel"] = {
+        "name": new_level,
+        "x": int(round(new_x)),
+        "y": int(round(new_y)),
+    }
 
 def handle_open_door(session, data, conn):
-    """
-    Handle PKTTYPE_OPEN_DOOR (0x2D)
-    The client requests to open a door, providing door_id (method_9).
-    The server replies with a 0x2E packet pointing to the target level.
-    """
     br = BitReader(data[4:])
-    try:
-        door_id = br.read_method_9()
-    except Exception as e:
-        print(f"[{session.addr}] ERROR: Failed to parse 0x2D packet: {e}, raw payload={data.hex()}")
-        return
+    door_id = br.read_method_9()
 
     current_level = session.current_level
     print(f"[{session.addr}] OpenDoor request: doorID={door_id}, current_level={current_level}")
 
-    is_dungeon = LEVEL_CONFIG.get(current_level, (None, None, None, False))[3]
+    # --- Resolve base mapping ---
     target_level = DOOR_MAP.get((current_level, door_id))
 
-    # Dungeon fallback if no mapping found
+    # --- Fallback: dungeon doors use entry_level if no mapping found ---
+    is_dungeon = LEVEL_CONFIG.get(current_level, (None, None, None, False))[3]
     if target_level is None and is_dungeon:
         target_level = session.entry_level
         if not target_level:
-            print(f"[{session.addr}] Error: No entry_level set for door {door_id} in dungeon {current_level}")
+            print(f"[{session.addr}] Error: No entry_level for door {door_id} in dungeon {current_level}")
             return
-    elif door_id == 999:
+
+    # --- Special case: 999 always returns to CraftTown ---
+    if door_id == 999:
         target_level = "CraftTown"
 
-    if target_level:
-        if target_level not in LEVEL_CONFIG:
-            print(f"[{session.addr}] Error: Target level {target_level} not found in LEVEL_CONFIG")
-            return
+    bb = BitBuffer()
+    bb.write_method_4(door_id)
+    bb.write_method_13(target_level)
 
-        # Build and send DoorTarget response (0x2E)
-        bb = BitBuffer()
-        bb.write_method_4(door_id)
-        bb.write_method_13(target_level)
-        payload = bb.to_bytes()
-        resp = struct.pack(">HH", 0x2E, len(payload)) + payload
-        conn.sendall(resp)
+    payload = bb.to_bytes()
+    resp = struct.pack(">HH", 0x2E, len(payload)) + payload
+    conn.sendall(resp)
 
-        print(f"[{session.addr}] Sent DOOR_TARGET: doorID={door_id}, level='{target_level}'")
+    print(f"[{session.addr}] Sent DOOR_TARGET: doorID={door_id}, level='{target_level}'")
 
-        # Reset world state for upcoming level transition
-        session.world_loaded = False
-        session.entities.clear()
-    else:
-        print(f"[{session.addr}] Error: No target for door {door_id} in level {current_level}")
+    # --- Prepare for upcoming level transition ---
+    session.world_loaded = False
+    session.entities.clear()
 
 def handle_level_transfer_request(session, data, conn):
     """
-    Handle 0x1D: player activated a door or mission exit to change levels.
+    Handle 0x1D: client says "I am ready to transfer".
+    We resolve the target level, save CurrentLevel/PreviousLevel for
+    non-dungeon zones (with CraftTown special handling), then send ENTER_WORLD.
     """
-    br = BitReader(data[4:])
-    try:
-        old_token = br.read_method_9()
-        level_name = br.read_method_13()
-    except Exception as e:
-        print(f"[{session.addr}] ERROR: Failed to parse 0x1D packet: {e}, raw payload={data.hex()}")
-        return
 
-    # Try to resolve (char, current_level, previous_level) entry
+    br = BitReader(data[4:])
+    old_token = br.read_method_9()
+    requested_level_name = br.read_method_13()
+
+    # Resolve character + default target level from token tables
     entry = used_tokens.get(old_token) or pending_world.get(old_token)
     if not entry:
         s = session_by_token.get(old_token)
         if s:
             entry = (
-                getattr(s, "current_char_dict", None)
-                or {"name": s.current_character},
+                getattr(s, "current_char_dict", None) or {"name": s.current_character},
                 s.current_level,
             )
+
     if not entry:
         print(f"[{session.addr}] ERROR: No character for token {old_token}")
         return
 
-    char, target_level = entry[:2]
+    char, default_target_level = entry[:2]
 
-    # Fallback if client didn't send level name
-    if not level_name:
-        level_name = target_level
-        print(f"[{session.addr}] WARNING: Empty level_name, using target_level={level_name}")
-
-    # Determine where player came from
-    raw = char.get("CurrentLevel")
-    if isinstance(raw, dict):
-        old_level = raw.get("name", session.current_level or "NewbieRoad")
+    # Sanitize requested level: treat empty or "None" as missing
+    if not requested_level_name or requested_level_name == "None":
+        target_level = default_target_level
+        print(
+            f"[{session.addr}] WARNING: Empty/None level_name in 0x1D, "
+            f"using target_level={target_level}"
+        )
     else:
-        old_level = raw or session.current_level or "NewbieRoad"
+        target_level = requested_level_name
 
-    # Clear old entity reference
+    # Determine old_level (where we are coming from logically)
+    old_level_rec = char.get("CurrentLevel")
+    if isinstance(old_level_rec, dict):
+        old_level = old_level_rec.get("name") or session.current_level or "NewbieRoad"
+    else:
+        old_level = old_level_rec or session.current_level or "NewbieRoad"
+
+    # Capture previous level coords *before* entity removal
+    ent = session.entities.get(session.clientEntID, {})
+    old_x = ent.get("pos_x", 0)
+    old_y = ent.get("pos_y", 0)
+    has_old_coord = bool(ent)  # Only True if we have real coordinates
+
+    # Remove old player entity if present
     if session.clientEntID in session.entities:
         del session.entities[session.clientEntID]
         print(f"[{session.addr}] Removed entity {session.clientEntID} from level {old_level}")
 
-    # --- user_id fix: always use session.user_id ---
+    # Ensure we know user_id
     if not session.user_id:
-        key = token_char.get(old_token)
-        if key:
-            uid, _ = key
-            session.user_id = uid
-            print(f"[{session.addr}] Restored user_id from token: {uid}")
-        else:
+        token_info = token_char.get(old_token)
+        if not token_info:
             print(f"[{session.addr}] ERROR: Could not resolve user_id for token {old_token}")
             return
+        session.user_id = token_info[0]
+        print(f"[{session.addr}] Restored user_id from token: {session.user_id}")
 
+    # Reload latest characters, ensure we're pointing to the right one
     session.char_list = load_characters(session.user_id)
     session.current_character = char["name"]
     session.authenticated = True
 
-    # Save previous coordinates
-    prev_rec = char.get("CurrentLevel", {})
-    prev_x = prev_rec.get("x", 0.0)
-    prev_y = prev_rec.get("y", 0.0)
-    char["PreviousLevel"] = {"name": old_level, "x": prev_x, "y": prev_y}
+    # Resolve mission/special door overrides
+    target_level = resolve_special_mission_doors(char, old_level, target_level)
 
-    # Resolve special doors & compute spawn coords
-    level_name = resolve_special_mission_doors(char, old_level, level_name)
-    new_x, new_y, new_has_coord = get_spawn_coordinates(char, old_level, level_name)
+    # Compute spawn coordinates for the NEW level (but don't spawn yet)
+    new_x, new_y, new_has_coord = get_spawn_coordinates(char, old_level, target_level)
 
-    # Persist update
-    for i, c in enumerate(session.char_list):
-        if c["name"] == char["name"]:
-            session.char_list[i] = char
-            break
-    else:
-        session.char_list.append(char)
+    # --- SAVE LOGIC: update CurrentLevel / PreviousLevel for non-dungeons ---
+    update_saved_levels_on_transfer(
+        char=char,
+        old_level=old_level,
+        new_level=target_level,
+        new_x=new_x,
+        new_y=new_y,
+    )
 
+    # Persist character list
     save_characters(session.user_id, session.char_list)
 
-    # Generate new transfer token
-    new_token = session.ensure_token(char, target_level=level_name, previous_level=old_level)
-    pending_world[new_token] = (char, level_name, old_level)
+    # Create a fresh transfer token for the new world
+    new_token = session.ensure_token(char, target_level=target_level, previous_level=old_level)
+    pending_world[new_token] = (char, target_level, old_level)
 
-    # Build and send ENTER_WORLD
-    try:
-        swf_path, map_id, base_id, is_inst = LEVEL_CONFIG[level_name]
-    except KeyError:
-        print(f"[{session.addr}] ERROR: Level '{level_name}' not found in LEVEL_CONFIG")
+    # Build and send ENTER_WORLD packet
+    if target_level not in LEVEL_CONFIG:
+        print(f"[{session.addr}] ERROR: Level '{target_level}' not found in LEVEL_CONFIG")
         return
 
-    old_swf, _, _, _ = LEVEL_CONFIG.get(old_level, ("", 0, 0, False))
-    is_hard = level_name.endswith("Hard")
+    new_swf, map_id, base_id, is_instanced = LEVEL_CONFIG[target_level]
+    old_swf = LEVEL_CONFIG.get(old_level, ("", 0, 0, False))[0]
+
+    is_hard = target_level.endswith("Hard")
+
     pkt_out = build_enter_world_packet(
         transfer_token=new_token,
         old_level_id=0,
         old_swf=old_swf,
-        has_old_coord=True,
-        old_x=int(round(prev_x)),
-        old_y=int(round(prev_y)),
+        has_old_coord=has_old_coord,
+        old_x=int(old_x),
+        old_y=int(old_y),
         host="127.0.0.1",
         port=8080,
-        new_level_swf=swf_path,
+        new_level_swf=new_swf,
         new_map_lvl=map_id,
         new_base_lvl=base_id,
-        new_internal=level_name,
+        new_internal=target_level,
         new_moment="Hard" if is_hard else "",
         new_alter="Hard" if is_hard else "",
-        new_is_dungeon=is_inst,
+        new_is_dungeon=is_instanced,
         new_has_coord=new_has_coord,
         new_x=int(round(new_x)),
         new_y=int(round(new_y)),
         char=char,
     )
+
     conn.sendall(pkt_out)
-    print(f"[{session.addr}] Sent ENTER_WORLD with token {new_token} for {level_name} → pos=({new_x},{new_y})")
+    print(
+        f"[{session.addr}] Sent ENTER_WORLD with token {new_token} "
+        f"for {target_level} → pos=({new_x},{new_y})"
+    )
 
 def handle_request_door_state(session, data, conn):
-    """
-    Handle packet 0x41: client requests the state of a door.
-    Server replies with 0x42 (door state + target).
-    """
-
     missions.load_mission_defs()# make sure mission defs are loaded
 
     if len(data) < 4:
@@ -311,12 +394,8 @@ def handle_request_door_state(session, data, conn):
 
     payload = data[4:4 + payload_length]
 
-    try:
-        br = BitReader(payload)
-        door_id = br.read_method_9()
-    except Exception as e:
-        print(f"[{session.addr}] [0x41] Failed to parse door request: {e}")
-        return
+    br = BitReader(payload)
+    door_id = br.read_method_9()
 
     door_state = door.DOORSTATE_CLOSED
     door_target = ""
@@ -371,8 +450,73 @@ def handle_request_door_state(session, data, conn):
     payload = bb.to_bytes()
     response = struct.pack(">HH", 0x42, len(payload)) + payload
 
-    try:
-        conn.sendall(response)
-        #print(f"[{session.addr}] [0x41] Door {door_id} → state={door_state}, target='{door_target}'")
-    except Exception as e:
-        print(f"[{session.addr}] [0x41] Failed to send door state: {e}")
+    conn.sendall(response)
+
+def handle_entity_incremental_update(session, data, all_sessions):
+    payload = data[4:]
+    br = BitReader(payload)
+    entity_id = br.read_method_4()
+    is_self = (entity_id == session.clientEntID)
+
+    delta_x = br.read_method_45()
+    delta_y = br.read_method_45()
+    delta_vx = br.read_method_45()
+
+    STATE_BITS = Entity.const_316
+    ent_state = br.read_method_6(STATE_BITS)
+
+    flags = {
+        'b_left':      bool(br.read_method_15()),
+        'b_running':   bool(br.read_method_15()),
+        'b_jumping':   bool(br.read_method_15()),
+        'b_dropping':  bool(br.read_method_15()),
+        'b_backpedal': bool(br.read_method_15()),
+    }
+
+    is_airborne = bool(br.read_method_15())
+    velocity_y = br.read_method_24() if is_airborne else 0
+
+    # --- calculate new position ---
+    ent = session.entities.get(entity_id, {})
+    old_x = ent.get("pos_x", 0)
+    old_y = ent.get("pos_y", 0)
+
+    new_x = old_x + delta_x
+    new_y = old_y + delta_y
+
+    ent.update({
+        "pos_x": new_x,
+        "pos_y": new_y,
+        "velocity_x": ent.get("velocity_x", 0) + delta_vx,
+        "velocity_y": velocity_y,
+        "ent_state": ent_state,
+        **flags
+    })
+
+    session.entities[entity_id] = ent
+
+    # --- update per-level player cache ---
+    if is_self:
+        players = level_players.setdefault(session.current_level, [])
+        players[:] = [p for p in players if p["id"] != entity_id]
+        players.append({"id": entity_id, "pos_x": new_x, "pos_y": new_y, "session": session})
+
+    # Only update saved coords if player is in a non-dungeon level or CraftTown
+    if is_self:
+        curr_level = session.current_level
+        is_dungeon = LEVEL_CONFIG.get(curr_level, ("", 0, 0, False))[3]
+
+        if curr_level == "CraftTown" or not is_dungeon:
+            # Update only coords, never PreviousLevel here
+            for char in session.char_list:
+                if char["name"] == session.current_character:
+                    if "CurrentLevel" not in char:
+                        char["CurrentLevel"] = {"name": curr_level, "x": new_x, "y": new_y}
+                    else:
+                        char["CurrentLevel"]["x"] = new_x
+                        char["CurrentLevel"]["y"] = new_y
+                    break
+
+    for other in all_sessions:
+        if other is not session and other.world_loaded and other.current_level == session.current_level:
+            other.conn.sendall(data)
