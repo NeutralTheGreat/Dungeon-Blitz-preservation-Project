@@ -1,8 +1,10 @@
 import struct
 
 from BitBuffer import BitBuffer
+from bitreader import BitReader
 from constants import Entity
-from globals import level_players
+from globals import level_players, get_active_character_name
+
 
 def build_and_send_zone_player_list(session, valid_entries):
     bb = BitBuffer()
@@ -45,4 +47,21 @@ def handle_zone_panel_request(session):
     level = session.current_level
     players = level_players.get(level)
     send_zone_players_update(session, players)
+
+def handle_public_chat(session, data, all_sessions):
+    br = BitReader(data[4:])
+    entity_id = br.read_method_9()
+    message   = br.read_method_13()
+    
+    # Forward raw unmodified packet to other players in the same level
+    for other in all_sessions:
+        if other is session:
+            continue
+        if not other.player_spawned:
+            continue
+        if other.current_level != session.current_level:
+            continue
+
+        other.conn.sendall(data)
+        print(f"[{get_active_character_name(session)}] Says : \"{message}\"")
 

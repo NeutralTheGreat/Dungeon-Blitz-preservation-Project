@@ -1151,48 +1151,6 @@ def handle_group_invite(session, data, all_sessions):
     print(f"[{session.addr}] [PKT65] Sent 0x58 invite to {invitee.current_character}")
 
 
-def handle_public_chat(session, data, all_sessions):
-    """
-    Packet 0x2C: global (level-wide) chat.
-    Client sends: method_9(entity_id), method_26(message)
-    Server rebroadcasts same format.
-    """
-
-
-    # 1) Parse incoming packet
-    payload = data[4:]
-    try:
-        br = BitReader(payload, debug=False)
-        entity_id = br.read_method_9()    # client used method_9
-        message   = br.read_method_13()   # readMethod13 pairs with writer method_26
-
-    except Exception as e:
-        print(f"[{session.addr}] [PKT2C] Error parsing chat: {e}, raw={payload.hex()}")
-        return
-
-    print(f"[{session.addr}] [PKT2C] Chat from {entity_id} ({session.current_character}): {message}")
-
-    # 2) Build the rebroadcast packet
-    bb = BitBuffer()
-    bb.write_method_9(entity_id)
-    bb.write_method_26(message)
-    body = bb.to_bytes()
-    header = struct.pack(">HH", 0x2C, len(body))
-    packet = header + body
-
-    # 3) Send to everyone else in the same level
-    for other in all_sessions:
-        if other is session:
-            continue
-        if not other.player_spawned or other.current_level != session.current_level:
-            continue
-        try:
-            other.conn.sendall(packet)
-            print(f"[{session.addr}] [PKT2C] → \"{message}\" to {other.addr} ({other.current_character})")
-        except Exception as e:
-            print(f"[{session.addr}] [PKT2C] Error sending to {other.addr}: {e}")
-
-
 def handle_linkupdater(session, data, all_sessions):
     payload = data[4:]
     br = BitReader(payload, debug=False)
