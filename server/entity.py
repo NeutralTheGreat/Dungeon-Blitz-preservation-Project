@@ -6,7 +6,7 @@ from typing import Dict, Any
 from BitBuffer import BitBuffer
 from bitreader import BitReader
 from constants import Entity, class_7, class_20, class_3, Game, LinkUpdater, EntType, GearType, class_64, class_21
-from globals import level_npcs
+from globals import level_npcs, level_players
 
 """
 Hints NPCs data 
@@ -422,6 +422,17 @@ def handle_entity_full_update(session, data, all_sessions):
 
         # Update server-side map
         session.entities[entity_id] = props
+
+        # add player to level_players
+        if is_player:
+            players = level_players.setdefault(session.current_level, [])
+            players[:] = [p for p in players if p["id"] != entity_id]
+            players.append({
+                "id": entity_id,
+                "pos_x": pos_x,
+                "pos_y": pos_y,
+                "session": session
+            })
 
         # First-time world load for this player
         if not session.player_spawned:

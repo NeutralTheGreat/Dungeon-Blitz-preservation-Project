@@ -510,12 +510,6 @@ def handle_entity_incremental_update(session, data, all_sessions):
 
     session.entities[entity_id] = ent
 
-    # --- update per-level player cache ---
-    if is_self:
-        players = level_players.setdefault(session.current_level, [])
-        players[:] = [p for p in players if p["id"] != entity_id]
-        players.append({"id": entity_id, "pos_x": new_x, "pos_y": new_y, "session": session})
-
     # Only update saved coords if player is in a non-dungeon level or CraftTown
     if is_self:
         curr_level = session.current_level
