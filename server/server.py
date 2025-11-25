@@ -13,6 +13,7 @@ from Commands import handle_gear_packet, \
     handle_change_offset_y, handle_start_skit, handle_lockbox_reward, handle_linkupdater, \
     handle_emote_begin, handle_mount_equip_packet, handle_pet_info_packet, \
     handle_collect_hatched_egg, handle_talk_to_npc, handle_char_regen, handle_request_armory_gears, handle_queue_potion
+from socials import handle_zone_panel_request
 from talent import handle_respec_talent_tree, handle_allocate_talent_tree_points, handle_talent_claim, \
     handle_talent_speedup, \
     handle_train_talent_point, handle_clear_talent_research, handle_active_talent_change_request
@@ -295,6 +296,8 @@ def handle_client(session: ClientSession):
             elif pkt == 0x7A:
                 handle_talk_to_npc(session, data, all_sessions)
                 pass
+            elif pkt == 0x95:
+                handle_zone_panel_request(session)
             ############################################
 
             # Group Related packets
