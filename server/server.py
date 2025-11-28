@@ -25,6 +25,12 @@ from Commands import handle_gear_packet, handle_apply_dyes, handle_equip_rune, h
     handle_change_offset_y, handle_start_skit, handle_lockbox_reward, handle_linkupdater, handle_emote_begin, handle_mount_equip_packet, \
     handle_pet_info_packet, handle_collect_hatched_egg, handle_talk_to_npc, handle_char_regen, handle_request_armory_gears, handle_queue_potion
 
+#===========#
+
+ENABLE_ADMIN_PANEL = False
+
+#===========#
+
 def _level_remove(level, session):
     s = level_registry.get(level)
     if s and session in s:
@@ -438,8 +444,26 @@ if __name__ == "__main__":
     print("For Browser running on : http://localhost/index.html")
     print("For Flash Projector running on : http://localhost/p/cbv/DungeonBlitz.swf?fv=cbq&gv=cbv")
 
-    #threading.Thread(target=run_admin_panel,args=(lambda: all_sessions, 5000),daemon=True).start()
-    #print("Debug Panel running on http://127.0.0.1:5000/")
+    if ENABLE_ADMIN_PANEL:
+        try:
+            from admin_panel import run_admin_panel
+
+            threading.Thread(target=run_admin_panel,args=(lambda: all_sessions, 5000),daemon=True).start()
+            print("Debug Panel running on http://127.0.0.1:5000/")
+        except ModuleNotFoundError:
+            print(
+                """
+        ------------------------------------------------------------------------------------------
+        Flask is not installed. Admin panel disabled.
+
+        If you want to use the admin panel you need to install Flask:
+
+        Enter this command in the command prompt => pip install flask
+
+        Then restart the server.
+        ------------------------------------------------------------------------------------------
+                """
+            )
     try:
         while True:
             time.sleep(1)
