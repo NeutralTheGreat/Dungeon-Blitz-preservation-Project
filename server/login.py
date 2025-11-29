@@ -292,15 +292,23 @@ def handle_gameserver_login(session, data, conn):
 
     # Build and send Player_Data
     send_ext = not extended_sent_map.get(session.user_id, {}).get("sent", False)
+
+    #TODO...
+    level_config = LEVEL_CONFIG.get(target_level, ("", 1, 1, False))
+    bonus_levels = level_config[2]
+
     welcome = Player_Data_Packet(
         char,
         transfer_token=token,
+        hp_scaling=0,
+        bonus_levels=bonus_levels,
         target_level=target_level,
         new_x=int(round(new_x)),
         new_y=int(round(new_y)),
         new_has_coord=new_has_coord,
         send_extended=send_ext,
     )
+
     extended_sent_map[session.user_id] = {"sent": True, "last_seen": time.time()}
     conn.sendall(welcome)
 

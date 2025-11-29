@@ -4,7 +4,6 @@ from BitBuffer import BitBuffer
 import struct
 import time
 from constants import (
-    GS_BITS,
     MAX_CHAR_LEVEL_BITS,
     class_10_const_83,
     GearType,
@@ -40,7 +39,8 @@ CLASS_BUILD_ORDER = {
 def Player_Data_Packet(char: dict,
                        event_index: int = 5,
                        transfer_token: int = 0,
-                       scaling_factor: int = 0,  # Unknown
+                       hp_scaling: int = 0,  #  increases the total HP for all entities in that level => game.const_790 = [1, 1.7, 2.4, 3.1] 4 values in total from 0 to 3
+                                             #  this likely was meant to go up by 1 for every party member
                        bonus_levels: int = 0,  # this is to scale the players Level on dungeons if the player joins a friends dungeon who is higher level or lower level
                        target_level: str = None,
                        new_x: int = None,
@@ -53,8 +53,8 @@ def Player_Data_Packet(char: dict,
     buf.write_method_4(transfer_token)
     current_game_time = int(time.time())
     buf.write_method_4(current_game_time)
-    scaling_factor = max(0, min(scaling_factor, 3))  # Clamp to 0–3 (2-bit range)
-    buf.write_method_6(scaling_factor, GS_BITS)
+    hp_scaling = max(0, min(hp_scaling, 3)) # Clamp to 0–3 (2-bit range)
+    buf.write_method_6(hp_scaling, Game.const_813)
     bonus_levels = max(0, min(bonus_levels, 0xFFFFFFFF))
     buf.write_method_4(bonus_levels)
 
