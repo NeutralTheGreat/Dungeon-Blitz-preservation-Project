@@ -1,5 +1,4 @@
 import json, struct
-import pprint
 import random
 import secrets
 import time
@@ -10,7 +9,7 @@ from bitreader import BitReader
 from constants import GearType, EntType, class_64, class_1, DyeType, Entity, class_3
 from BitBuffer import BitBuffer
 from constants import get_dye_color
-from globals import build_start_skit_packet, send_premium_purchase, _send_error, get_active_character_name
+from globals import build_start_skit_packet, send_premium_purchase, _send_error
 
 
 #TODO...
@@ -837,55 +836,6 @@ def PaperDoll_Request(session, data, conn):
         conn.sendall(struct.pack(">HH", 0x1A, 0))
         #print(f"[{session.addr}] [PKT0x19] Character '{name}' not found. Sent empty paperdoll.")
 
-def handle_pet_info_packet(session, data, all_sessions):
-    """
-    Handle packet type 0xB3 (SendPetInfoToServer).
-    Updates the active pet (equippedPetID) and the restingPets list in the save file.
-    """
-    payload = data[4:]
-    reader = BitReader(payload, debug=True)
-
-    try:
-        pets = []
-        for _ in range(4):  # 1 active + 3 resting
-            pet_type_id = reader.read_method_6(7)  # 7-bit pet type ID
-            value = reader.read_method_4()         # Variable-length value
-            pets.append((pet_type_id, value))
-
-        active_pet_type, active_pet_value = pets[0]
-        resting_pets_data = [
-            {"typeID": pets[1][0]},
-            {"typeID": pets[2][0]},
-            {"typeID": pets[3][0]}
-        ]
-
-        # Log for debug
-        print(f"[{session.addr}] [PKT0xB3] Active pet: type={active_pet_type}, value={active_pet_value}")
-        for i, pet in enumerate(resting_pets_data, 1):
-            print(f"[{session.addr}] [PKT0xB3] Resting pet {i}: type={pet['typeID']}, value={pets[i][1]}")
-
-        # --- Update save file ---
-        for char in session.char_list:
-            if char.get("name") != session.current_character:
-                continue
-
-            # Update equippedPetID
-            char["equippedPetID"] = active_pet_type
-
-            # Update restingPets list
-            char["restingPets"] = resting_pets_data
-
-            # Persist changes
-            save_characters(session.user_id, session.char_list)
-            print(f"[Save] Updated pets for {session.current_character} → activePetID={active_pet_type}, resting={resting_pets_data}")
-            break
-        else:
-            print(f"[{session.addr}] [PKT0xB3] ERROR: character {session.current_character} not found")
-
-    except Exception as e:
-        print(f"[{session.addr}] [PKT0xB3] Error parsing packet: {e}")
-        for line in reader.get_debug_log():
-            print(line)
 
 def handle_mount_equip_packet(session, data, all_sessions):
     """

@@ -20,10 +20,12 @@ from entity import handle_entity_full_update
 from combat import handle_entity_destroy, handle_buff_tick_dot, handle_respawn_broadcast, handle_request_respawn, handle_grant_reward, handle_power_hit, handle_projectile_explode, handle_add_buff, handle_remove_buff, handle_change_max_speed, handle_power_cast
 from buildings import handle_building_claim, handle_building_upgrade, handle_building_speed_up_request, handle_cancel_building_upgrade
 from socials import handle_zone_panel_request, handle_public_chat, handle_private_message
+from pets import handle_equip_pets
 from Commands import handle_gear_packet, handle_apply_dyes, handle_equip_rune, handle_change_look, handle_create_gearset, handle_name_gearset, \
     handle_apply_gearset, handle_update_equipment, handle_group_invite, PaperDoll_Request, handle_hp_increase_notice, handle_volume_enter, \
     handle_change_offset_y, handle_start_skit, handle_lockbox_reward, handle_linkupdater, handle_emote_begin, handle_mount_equip_packet, \
-    handle_pet_info_packet, handle_collect_hatched_egg, handle_talk_to_npc, handle_char_regen, handle_request_armory_gears, handle_queue_potion
+    handle_collect_hatched_egg, handle_talk_to_npc, handle_char_regen, handle_request_armory_gears, handle_queue_potion
+
 
 #===========#
 
@@ -368,7 +370,7 @@ def handle_client(session: ClientSession):
             elif pkt == 0xB2:
                 handle_mount_equip_packet(session, data, all_sessions)
             elif pkt == 0xB3:
-                handle_pet_info_packet(session, data, all_sessions)
+                handle_equip_pets(session, data, all_sessions)
             elif pkt == 0xEA:
                 handle_collect_hatched_egg(session, data)
             elif pkt == 0xC8:

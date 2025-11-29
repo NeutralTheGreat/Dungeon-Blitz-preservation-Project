@@ -159,12 +159,13 @@ def Send_Entity_Data(entity: Dict[str, Any]) -> bytes:
         if bb.debug:
             bb.debug_log.append(f"appearance_flag={appearance_flag}")
 
-        #the actual purpose of these 4 lines  are currently unknown but the client reads the data properly
+        #the actual purpose of these 3 lines  are currently unknown but the client reads the data properly
         # ====================================
-        bb.write_method_6(entity.get("PetTypeID", 0), class_7.const_19)
-        bb.write_method_6(entity.get("PetLevel", 0), class_7.const_75)
-        bb.write_method_6(entity.get("MountID", 0), class_20.const_297)
-        bb.write_method_6(entity.get("Emote_ID", 0), class_3.const_69)
+        active_pet = entity.get("activePet", {})
+        bb.write_method_6(active_pet.get("petID",      0), class_7.const_19)
+        bb.write_method_6(active_pet.get("special_id", 0), class_7.const_75)
+        bb.write_method_6(entity.get("equippedMount",  0), class_20.const_297) # this one is correct
+        bb.write_method_6(entity.get("Unknown",        0), class_3.const_69)
         # ====================================
         abilities = entity.get("abilities", [])
         has_abilities = len(abilities) > 0

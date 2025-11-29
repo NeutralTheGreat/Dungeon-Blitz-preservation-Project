@@ -188,7 +188,7 @@ def Player_Data_Packet(char: dict,
             type_id = pet.get("typeID", 0)
             iteration = pet.get("level", 0)
             attr1 = pet.get("xp", 0)
-            attr2 = pet.get("iteration", 0)
+            attr2 = pet.get("special_id", 0)
             type_id = max(0, min(type_id, 127))
             iteration = max(0, min(iteration, 63))
             buf.write_method_6(type_id, 7)
@@ -463,7 +463,7 @@ def Player_Data_Packet(char: dict,
                 r = rest[i]
                 buf.write_method_11(1, 1)
                 buf.write_method_6(r["typeID"], class_7_const_19)
-                buf.write_method_4(0)  # a value bigger than 0 will cause the pet not to show in the resting slot not sure what the actual function of this so im just going to leave it 0
+                buf.write_method_4(r["special_id"])
             else:
                 buf.write_method_11(0, 1)
 
@@ -473,7 +473,7 @@ def Player_Data_Packet(char: dict,
             tp = tp_list[0]
             buf.write_method_11(1, 1)
             buf.write_method_6(tp["typeID"], class_7_const_19)
-            buf.write_method_4(0)  # a value bigger than 0 will cause the pet not to show in the training slot not sure what the actual function of this so im just going to leave it 0
+            buf.write_method_4(tp["special_id"])
             buf.write_method_4(tp.get("trainingTime", 0))
         else:
             buf.write_method_11(0, 1)
@@ -529,10 +529,12 @@ def Player_Data_Packet(char: dict,
     equipped = char.get("equippedMount", 0)
     buf.write_method_4(equipped)
 
-    # ──────────────(equippedPetID)──────────────
-    pet_type_id = char.get("equippedPetID", 0)
-    buf.write_method_4(pet_type_id)
-    buf.write_method_4(0)  # Always zero, no iteration data
+    # ──────────────(activePet)──────────────
+    active = char.get("activePet", {})
+    pet_type_id = active.get("typeID", 0)
+    pet_iter_id = active.get("special_id", 0)
+    buf.write_method_4(pet_type_id)  # typeID
+    buf.write_method_4(pet_iter_id)  # unique pet id
 
     # ──────────────(activeConsumableID and queuedConsumableID)──────────────
     active_consumable_id = char.get("activeConsumableID", 0)
