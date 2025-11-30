@@ -354,117 +354,141 @@ def handle_entity_full_update(session, data, all_sessions):
     - Marks player entity IDs.
     - Sends 0x0F spawn packets so players see each other.
     - Broadcasts raw 0x08 packets for movement/state sync.
+    - sends 0x0F for newly-seen non-player entities (pets/minions).
     """
-    payload = data[4:]
-    br = BitReader(payload, debug=True)
-    try:
-        # ── Parse fields ──
-        entity_id  = br.read_method_9()
-        pos_x      = br.read_method_24()
-        pos_y      = br.read_method_24()
-        velocity_x = br.read_method_24()
-        ent_name   = br.read_method_26()
+    br = BitReader(data[4:])
 
-        team       = br.read_method_20(Entity.TEAM_BITS)
-        is_player  = bool(br.read_method_15())
-        y_offset   = br.read_method_706()
+    entity_id = br.read_method_9()
+    pos_x = br.read_method_24()
+    pos_y = br.read_method_24()
+    velocity_x = br.read_method_24()
+    ent_name = br.read_method_26()
 
-        # Optional cue data
-        has_cue = bool(br.read_method_15())
-        cue_data = {}
-        if has_cue:
-            if bool(br.read_method_15()):
-                cue_data["character_name"] = br.read_method_13()
-            if bool(br.read_method_15()):
-                cue_data["DramaAnim"] = br.read_method_13()
-            if bool(br.read_method_15()):
-                cue_data["SleepAnim"] = br.read_method_13()
+    team = br.read_method_20(Entity.TEAM_BITS)
+    is_player = bool(br.read_method_15())
+    y_offset = br.read_method_706()
 
-        has_summoner = bool(br.read_method_15())
-        summoner_id = br.read_method_9() if has_summoner else None
+    # Optional cue data
+    has_cue = bool(br.read_method_15())
+    cue_data = {}
+    if has_cue:
+        if bool(br.read_method_15()):
+            cue_data["character_name"] = br.read_method_13()
+        if bool(br.read_method_15()):
+            cue_data["DramaAnim"] = br.read_method_13()
+        if bool(br.read_method_15()):
+            cue_data["SleepAnim"] = br.read_method_13()
 
-        has_power = bool(br.read_method_15())
-        power_id  = br.read_method_9() if has_power else None
+    has_summoner = bool(br.read_method_15())
+    summoner_id = br.read_method_9() if has_summoner else None
 
-        ent_state   = br.read_method_20(Entity.const_316)
-        b_left      = bool(br.read_method_15())
-        b_running   = bool(br.read_method_15())
-        b_jumping   = bool(br.read_method_15())
-        b_dropping  = bool(br.read_method_15())
-        b_backpedal = bool(br.read_method_15())
+    has_power = bool(br.read_method_15())
+    power_id = br.read_method_9() if has_power else None
 
-        # Track client’s entity ID
-        if is_player and session.clientEntID is None:
-            session.clientEntID = entity_id
-            print(f"[{session.addr}] [PKT08] Learned clientEntID = {entity_id}")
+    ent_state = br.read_method_20(Entity.const_316)
+    b_left = bool(br.read_method_15())
+    b_running = bool(br.read_method_15())
+    b_jumping = bool(br.read_method_15())
+    b_dropping = bool(br.read_method_15())
+    b_backpedal = bool(br.read_method_15())
 
-        # Build props
-        props = {
+    # Track client’s entity ID
+    if is_player and session.clientEntID is None:
+        session.clientEntID = entity_id
+        print(f"[{session.addr}] [PKT08] Learned clientEntID = {entity_id}")
+
+    # Build props
+    props = {
+        "pos_x": pos_x,
+        "pos_y": pos_y,
+        "velocity_x": velocity_x,
+        "ent_name": ent_name,
+        "team": team,
+        "is_player": is_player,
+        "y_offset": y_offset,
+        "cue_data": cue_data,
+        "summoner_id": summoner_id,
+        "power_id": power_id,
+        "ent_state": ent_state,
+        "b_left": b_left,
+        "b_running": b_running,
+        "b_jumping": b_jumping,
+        "b_dropping": b_dropping,
+        "b_backpedal": b_backpedal,
+    }
+
+    # Was this entity already known in this session?
+    is_new_entity = entity_id not in session.entities
+
+    # Update server-side map
+    session.entities[entity_id] = props
+
+    # add player to level_players
+    if is_player:
+        players = level_players.setdefault(session.current_level, [])
+        players[:] = [p for p in players if p["id"] != entity_id]
+        players.append({
+            "id": entity_id,
             "pos_x": pos_x,
             "pos_y": pos_y,
-            "velocity_x": velocity_x,
-            "ent_name": ent_name,
-            "team": team,
-            "is_player": is_player,
-            "y_offset": y_offset,
-            "cue_data": cue_data,
-            "summoner_id": summoner_id,
-            "power_id": power_id,
-            "ent_state": ent_state,
-            "b_left": b_left,
-            "b_running": b_running,
-            "b_jumping": b_jumping,
-            "b_dropping": b_dropping,
-            "b_backpedal": b_backpedal,
+            "session": session
+        })
+
+    # ─────────────────────────────
+    # spawn non-player entities (pets / minions) for other clients
+    # ─────────────────────────────
+    if is_new_entity and not is_player:
+
+        ent_dict = {
+            "id": entity_id,
+            "name": ent_name,
+            "is_player": False,
+            "x": int(pos_x),
+            "y": int(pos_y),
+            "v": int(velocity_x),
+            "team": int(team),
+            "summonerId": summoner_id or 0,
+            "power_id": power_id or 0,
+            "entState": ent_state,
+            "facing_left": b_left,
+            "health_delta": 0,
+            "buffs": [],
         }
 
-        #print(f"[{session.addr}] [PKT08] Parsed entity {entity_id}:")
-        #pprint.pprint(props, indent=4)
+        pkt = Send_Entity_Data(ent_dict)
+        framed = struct.pack(">HH", 0x0F, len(pkt)) + pkt
 
-        # Update server-side map
-        session.entities[entity_id] = props
-
-        # add player to level_players
-        if is_player:
-            players = level_players.setdefault(session.current_level, [])
-            players[:] = [p for p in players if p["id"] != entity_id]
-            players.append({
-                "id": entity_id,
-                "pos_x": pos_x,
-                "pos_y": pos_y,
-                "session": session
-            })
-
-        # First-time world load for this player
-        if not session.player_spawned:
-            session.player_spawned = True
-            send_existing_entities_to_joiner(session, all_sessions)
-
-            # Broadcast THIS player’s spawn to others
-            char = next((c for c in session.char_list if c.get("name") == session.current_character), None)
-            if char:
-                ent_dict = build_entity_dict(entity_id, char, props)
-                try:
-                    pkt = Send_Entity_Data(ent_dict)
-                    framed = struct.pack(">HH", 0x0F, len(pkt)) + pkt
-                    for other in all_sessions:
-                        if other is not session and other.player_spawned and other.current_level == session.current_level:
-                            other.conn.sendall(framed)
-                            print(f"[JOIN] Broadcasted Send_Entity_Data for {ent_dict['name']} → {other.addr}")
-                except Exception as e:
-                    print(f"[JOIN] Failed to build/broadcast Send_Entity_Data for new player: {e}")
-
-        # Always forward raw 0x08 packet for movement sync
         for other in all_sessions:
-            if other is not session and other.player_spawned and other.current_level == session.current_level:
-                other.conn.sendall(data)
-                print(f"[{session.addr}] [PKT08] Broadcasted raw packet to {other.addr}")
+            if (
+                    other is not session
+                    and other.player_spawned
+                    and other.current_level == session.current_level
+            ):
+                other.conn.sendall(framed)
+                print(f"[SPAWN] Broadcasted new entity {entity_id} ({ent_name}) → {other.addr}")
 
-    except Exception as e:
-        print(f"[{session.addr}] [PKT08] Error parsing packet: {e}")
-        if br.debug:
-            for log_line in br.get_debug_log():
-                print(log_line)
+    # First-time world load for this player
+    if not session.player_spawned:
+        session.player_spawned = True
+        send_existing_entities_to_joiner(session, all_sessions)
+
+        # Broadcast THIS player’s spawn to others
+        char = next(
+            (c for c in session.char_list if c.get("name") == session.current_character),
+            None
+        )
+        if char:
+            ent_dict = build_entity_dict(entity_id, char, props)
+            pkt = Send_Entity_Data(ent_dict)
+            framed = struct.pack(">HH", 0x0F, len(pkt)) + pkt
+            for other in all_sessions:
+                if (
+                        other is not session
+                        and other.player_spawned
+                        and other.current_level == session.current_level
+                ):
+                    other.conn.sendall(framed)
+                    print(f"[JOIN] Broadcasted Send_Entity_Data for {ent_dict['name']} → {other.addr}")
 
 def ensure_level_npcs(level_name):
     """
