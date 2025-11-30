@@ -866,43 +866,6 @@ def handle_mount_equip_packet(session, data, all_sessions):
             print(line)
 
 
-def handle_emote_begin(session, data, all_sessions):
-    """
-    Packet 0x7E: an entity starts an emote.
-    Client sends:
-      method_9(entityID) -> var-int via write_method_4
-      method_26(emoteString)
-    Other clients read:
-      method_4() for ID, method_13() for the string.
-    """
-
-
-
-    # 1) Parse the emote packet
-    payload = data[4:]
-    br = BitReader(payload, debug=False)
-    try:
-        entity_id = br.read_method_4()
-        emote     = br.read_method_13()
-    except Exception as e:
-        print(f"[{session.addr}] [PKT7E] Parse error: {e}, raw={payload.hex()}")
-        return
-
-    print(f"[{session.addr}] [PKT7E] Entity {entity_id} began emote \"{emote}\"")
-
-    # 2) Broadcast unchanged packet to all other clients in the same level
-    for other in all_sessions:
-        if (other is not session
-            and other.player_spawned
-            and other.current_level == session.current_level):
-            try:
-                other.conn.sendall(data)
-            except Exception as e:
-                print(f"[{session.addr}] [PKT7E] Error forwarding to {other.addr}: {e}")
-
-
-
-
 def handle_group_invite(session, data, all_sessions):
     """
     Packet 0x65: /invite <player>

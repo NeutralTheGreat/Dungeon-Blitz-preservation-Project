@@ -183,3 +183,16 @@ def handle_start_skit(session, data, all_sessions):
                 pass
 
     print(f"[SKIT] Entity {entity_id} says: '{text}'")
+
+
+def handle_emote_begin(session, data, all_sessions):
+    br = BitReader(data[4:])
+
+    entity_id = br.read_method_4()
+    emote = br.read_method_13()
+
+    for other in all_sessions:
+        if (other is not session
+            and other.player_spawned
+            and other.current_level == session.current_level):
+            other.conn.sendall(data)
