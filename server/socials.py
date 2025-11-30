@@ -4,7 +4,8 @@ from BitBuffer import BitBuffer
 from Character import load_characters
 from bitreader import BitReader
 from constants import Entity
-from globals   import level_players, get_active_character_name , current_characters
+from globals import level_players, get_active_character_name, current_characters, build_room_thought_packet
+
 
 # Helpers
 ############################################################
@@ -148,3 +149,19 @@ def handle_private_message(session, data, all_sessions):
 
     print(f"[PM-ERR] {sender_name} → {recipient_name} (NOT FOUND)")
 
+def handle_room_thought(session, data, all_sessions):
+    br = BitReader(data[4:])
+
+    entity_id = br.read_method_4()
+    text = br.read_method_13()
+
+    level = session.current_level
+
+    pkt = build_room_thought_packet(entity_id, text)
+
+    for s in all_sessions:
+        if s.player_spawned and s.current_level == level:
+            try:
+                s.conn.sendall(pkt)
+            except:
+                pass

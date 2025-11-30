@@ -6,7 +6,7 @@ from Character import save_characters
 from Commands import build_loot_drop_packet
 from bitreader import BitReader
 from constants import LinkUpdater, Entity, PowerType
-from globals import send_consumable_update
+from globals import send_consumable_update, build_change_offset_y_packet
 
                 # Helpers
     #####################################
@@ -360,3 +360,16 @@ def handle_power_cast(session, data, all_sessions):
         ):
             other.conn.sendall(data)
 
+def handle_change_offset_y(session, data, all_sessions):
+    br = BitReader(data[4:])
+    entity_id = br.read_method_9()
+    offset_y  = br.read_method_739()
+
+    pkt = build_change_offset_y_packet(entity_id, offset_y)
+
+    for s in all_sessions:
+        if s is not session and s.player_spawned and s.current_level == session.current_level:
+            try:
+                s.conn.sendall(pkt)
+            except:
+                pass

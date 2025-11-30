@@ -175,3 +175,17 @@ def Client_Crash_Reports(session, data):
     payload = data[4:4 + length]
     msg = payload.decode("utf-8", errors="replace")
     print(f"[{session.addr}] CLIENT ERROR (0x7C): {msg}")
+
+def build_room_thought_packet(entity_id: int, text: str) -> bytes:
+    bb = BitBuffer()
+    bb.write_method_4(entity_id)
+    bb.write_method_13(text)
+    body = bb.to_bytes()
+    return struct.pack(">HH", 0x76, len(body)) + body
+
+def build_change_offset_y_packet(entity_id: int, offset_y: int) -> bytes:
+    bb = BitBuffer()
+    bb.write_method_4(entity_id)
+    bb.write_method_739(offset_y)
+    payload = bb.to_bytes()
+    return struct.pack(">HH", 0x7D, len(payload)) + payload

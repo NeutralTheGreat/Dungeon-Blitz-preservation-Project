@@ -17,13 +17,15 @@ from Forge import handle_forge_speed_up_packet, handle_start_forge, handle_colle
 from talent import handle_respec_talent_tree, handle_allocate_talent_tree_points, handle_talent_claim, handle_talent_speedup, handle_train_talent_point, handle_clear_talent_research, handle_active_talent_change_request
 from skills import handle_skill_trained_claim, handle_skill_research_cancel_request, handle_skill_speed_up_request, handle_start_skill_training, handle_equip_active_skills
 from entity import handle_entity_full_update
-from combat import handle_entity_destroy, handle_buff_tick_dot, handle_respawn_broadcast, handle_request_respawn, handle_grant_reward, handle_power_hit, handle_projectile_explode, handle_add_buff, handle_remove_buff, handle_change_max_speed, handle_power_cast
+from combat import handle_entity_destroy, handle_buff_tick_dot, handle_respawn_broadcast, handle_request_respawn, \
+    handle_grant_reward, handle_power_hit, handle_projectile_explode, handle_add_buff, handle_remove_buff, \
+    handle_change_max_speed, handle_power_cast, handle_change_offset_y
 from buildings import handle_building_claim, handle_building_upgrade, handle_building_speed_up_request, handle_cancel_building_upgrade
-from socials import handle_zone_panel_request, handle_public_chat, handle_private_message
+from socials import handle_zone_panel_request, handle_public_chat, handle_private_message, handle_room_thought
 from pets import handle_equip_pets
 from Commands import handle_gear_packet, handle_apply_dyes, handle_equip_rune, handle_change_look, handle_create_gearset, handle_name_gearset, \
     handle_apply_gearset, handle_update_equipment, handle_group_invite, PaperDoll_Request, handle_hp_increase_notice, handle_volume_enter, \
-    handle_change_offset_y, handle_start_skit, handle_lockbox_reward, handle_linkupdater, handle_emote_begin, handle_mount_equip_packet, \
+    handle_start_skit, handle_lockbox_reward, handle_linkupdater, handle_emote_begin, handle_mount_equip_packet, \
     handle_collect_hatched_egg, handle_talk_to_npc, handle_char_regen, handle_request_armory_gears, handle_queue_potion
 
 
@@ -322,6 +324,8 @@ def handle_client(session: ClientSession):
                 handle_grant_reward(session, data, all_sessions)
             elif pkt == 0x09:
                 handle_power_cast(session, data, all_sessions)
+            elif pkt == 0x7D:
+                handle_change_offset_y(session, data, all_sessions)
             ############################################
 
             # buildings.py
@@ -344,6 +348,8 @@ def handle_client(session: ClientSession):
                 handle_public_chat(session, data, all_sessions)
             elif pkt == 0x46:
                 handle_private_message(session, data, all_sessions)
+            elif pkt == 0x76:
+                handle_room_thought(session, data, all_sessions)
             ############################################
 
 
@@ -351,8 +357,6 @@ def handle_client(session: ClientSession):
             ############################################
             elif pkt == 0x19:
                 PaperDoll_Request(session, data, conn)
-            elif pkt == 0x7D:
-                handle_change_offset_y(session, data)
             elif pkt == 0xA2:
                 handle_linkupdater(session, data)
             elif pkt == 0xC5:

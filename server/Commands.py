@@ -617,24 +617,6 @@ def handle_char_regen(session, data):
 def handle_volume_enter(session, data):
      pass
 
-def handle_change_offset_y(session, data):
-    payload = data[4:]
-    br = BitReader(payload, debug=True)
-
-    try:
-        ent_id = br.read_method_9()
-        offset_y = br.read_method_706()
-
-        print(f"[PKT125] ent_id={ent_id}, offset_y={offset_y}")
-
-        entity = session.get_entity(ent_id)
-        if entity:
-            entity.target_offset_y = offset_y
-        else:
-            print(f"[PKT125] Unknown entity ID: {ent_id}")
-
-    except Exception as e:
-        print(f"[{session.addr}] [PKT125] Error parsing packet: {e}")
 
 #handled
 #############################################
