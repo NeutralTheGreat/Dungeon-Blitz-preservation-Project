@@ -1,10 +1,12 @@
+import secrets
 import struct
 
 from BitBuffer import BitBuffer
 from Character import load_characters
 from bitreader import BitReader
 from constants import Entity
-from globals import level_players, get_active_character_name, current_characters, build_room_thought_packet
+from globals import level_players, get_active_character_name, current_characters, build_room_thought_packet, \
+    _send_error, send_chat_status
 
 
 # Helpers
@@ -196,3 +198,166 @@ def handle_emote_begin(session, data, all_sessions):
             and other.player_spawned
             and other.current_level == session.current_level):
             other.conn.sendall(data)
+
+
+def handle_group_invite(session, data, all_sessions):
+    br = BitReader(data[4:], debug=False)
+    invitee_name = br.read_method_13()
+
+    invitee = next((
+        s for s in all_sessions
+        if s.authenticated
+           and s.current_character
+           and s.current_character.lower() == invitee_name.lower()
+    ), None)
+
+    if not invitee:
+        _send_error(session.conn, f"Player {invitee_name} not found")
+        return
+
+    # Reject if invitee already in a group
+    if getattr(invitee, 'group_id', None):
+        _send_error(session.conn, f"{invitee_name} is already in a group")
+        return
+
+    # Send the invite popup
+    bb = BitBuffer()
+    inviter_id   = session.clientEntID or 0
+    inviter_name = session.current_character
+    invite_text  = f"{inviter_name} has invited you to join a party"
+
+    bb.write_method_9(inviter_id)
+    bb.write_method_26(inviter_name)
+    bb.write_method_26(invite_text)
+    body = bb.to_bytes()
+    invite_packet = struct.pack(">HH", 0x58, len(body)) + body
+
+    invitee.conn.sendall(invite_packet)
+
+
+def build_group_update_packet(members):
+    """
+    members = list of (session, is_leader)
+    """
+    bb = BitBuffer()
+
+    # group exists
+    bb.write_method_15(True)
+
+    # group locked? (no)
+    bb.write_method_15(False)
+
+    # member count
+    bb.write_method_4(len(members))
+
+    for (sess, is_leader) in members:
+        name = sess.current_character or ""
+
+        bb.write_method_15(is_leader)
+
+        # for now always True, we can make this dynamic later
+        is_online = True
+        bb.write_method_15(is_online)
+
+        bb.write_method_26(name)
+
+        # only if online:
+        if is_online:
+            ent = sess.entities.get(sess.clientEntID, {})
+            x = int(ent.get("pos_x", 0))
+            y = int(ent.get("pos_y", 0))
+
+            bb.write_method_91(x)
+            bb.write_method_91(y)
+
+            # sameLevel flag
+            same_level = True
+            bb.write_method_15(same_level)
+            #TODO...
+            # if not same_level:
+            #     level_name = getattr(sess, "current_level", "") or ""
+            #     bb.write_method_26(level_name)
+
+    payload = bb.to_bytes()
+    return struct.pack(">HH", 0x75, len(payload)) + payload
+
+
+def handle_query_message_answer(session, data, all_sessions):
+    br = BitReader(data[4:])
+    token    = br.read_method_9()
+    name     = br.read_method_26()
+    accepted = br.read_method_15()
+
+    # Find inviter by entity ID
+    inviter = next((s for s in all_sessions if s.clientEntID == token), None)
+    if not inviter:
+        return
+
+    # DECLINED
+    if not accepted:
+        send_chat_status(inviter, f"{session.current_character} declined your invite.")
+        return
+
+    if getattr(session, "group_id", None):
+        send_chat_status(inviter, f"{session.current_character} is already in a party.")
+        return
+
+    # Determine party for inviter
+    if getattr(inviter, "group_id", None):
+        gid = inviter.group_id
+        group = inviter.group_members
+    else:
+        gid = secrets.randbits(16)
+        inviter.group_id = gid
+        inviter.group_members = [inviter]
+        group = inviter.group_members
+
+    # invitee to the same party
+    session.group_id = gid
+    group.append(session)
+    session.group_members = group  # shared list
+
+    # Build full party list for packet
+    members = []
+    for s in group:
+        is_leader = (s is group[0])  # leader = first member
+        members.append((s, is_leader))
+
+    packet = build_group_update_packet(members)
+    for s, _ in members:
+        try:
+            s.conn.sendall(packet)
+        except:
+            pass
+
+def build_groupmate_map_packet(sess, x, y):
+    bb = BitBuffer()
+
+    # name of the player whose coords are being updated
+    bb.write_method_26(sess.current_character)
+    bb.write_method_91(x)
+    bb.write_method_91(y)
+
+    body = bb.to_bytes()
+    return struct.pack(">HH", 0x8C, len(body)) + body
+
+# client only sends this when the player is in a party
+def handle_map_location_update(session, data, all_sessions):
+    br = BitReader(data[4:])
+
+    map_x = br.read_method_236()
+    map_y = br.read_method_236()
+
+    session.map_x = map_x
+    session.map_y = map_y
+
+    # Broadcast to GROUP only
+    for member in session.group_members:
+        if member is session:
+            continue  # skip sender
+
+        pkt = build_groupmate_map_packet(session, map_x, map_y)
+        try:
+            member.conn.sendall(pkt)
+        except:
+            pass

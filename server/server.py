@@ -22,10 +22,10 @@ from combat import handle_entity_destroy, handle_buff_tick_dot, handle_respawn_b
     handle_change_max_speed, handle_power_cast, handle_change_offset_y
 from buildings import handle_building_claim, handle_building_upgrade, handle_building_speed_up_request, handle_cancel_building_upgrade
 from socials import handle_zone_panel_request, handle_public_chat, handle_private_message, handle_room_thought, \
-    handle_start_skit, handle_emote_begin
+    handle_start_skit, handle_emote_begin, handle_group_invite, handle_query_message_answer, handle_map_location_update
 from pets import handle_equip_pets, handle_mount_equip_packet
 from Commands import handle_gear_packet, handle_apply_dyes, handle_equip_rune, handle_change_look, handle_create_gearset, handle_name_gearset, \
-    handle_apply_gearset, handle_update_equipment, handle_group_invite, PaperDoll_Request, handle_hp_increase_notice, handle_volume_enter, \
+    handle_apply_gearset, handle_update_equipment, PaperDoll_Request, handle_hp_increase_notice, handle_volume_enter, \
     handle_lockbox_reward, handle_linkupdater, handle_collect_hatched_egg, handle_talk_to_npc, handle_char_regen, handle_request_armory_gears, handle_queue_potion
 
 
@@ -354,6 +354,12 @@ def handle_client(session: ClientSession):
                 handle_start_skit(session, data, all_sessions)
             elif pkt == 0x7E:
                 handle_emote_begin(session, data, all_sessions)
+            elif pkt == 0x65:
+                handle_group_invite(session, data, all_sessions)
+            elif pkt == 0x59:
+                handle_query_message_answer(session, data, all_sessions)
+            elif pkt == 0x8b:
+                handle_map_location_update(session, data, all_sessions)
             ############################################
 
             # pets.py
@@ -372,8 +378,6 @@ def handle_client(session: ClientSession):
                 handle_linkupdater(session, data)
             elif pkt == 0x7A:
                 handle_talk_to_npc(session, data)
-            elif pkt == 0x65:
-                handle_group_invite(session, data, all_sessions)
             elif pkt == 0x8E:
                 handle_change_look(session, data, all_sessions)
             elif pkt == 0xBA:

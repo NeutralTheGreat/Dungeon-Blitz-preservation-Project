@@ -1,6 +1,5 @@
 import json, struct
 import random
-import secrets
 import time
 
 from Character import save_characters, build_paperdoll_packet, get_inventory_gears, \
@@ -9,7 +8,7 @@ from bitreader import BitReader
 from constants import GearType, EntType, class_64, class_1, DyeType, Entity, class_3
 from BitBuffer import BitBuffer
 from constants import get_dye_color
-from globals import build_start_skit_packet, send_premium_purchase, _send_error
+from globals import build_start_skit_packet, send_premium_purchase
 from missions import get_mission_extra
 
 
@@ -885,65 +884,6 @@ def PaperDoll_Request(session, data, conn):
         conn.sendall(struct.pack(">HH", 0x1A, 0))
         #print(f"[{session.addr}] [PKT0x19] Character '{name}' not found. Sent empty paperdoll.")
 
-
-def handle_group_invite(session, data, all_sessions):
-    """
-    Packet 0x65: /invite <player>
-    Only the invitee gets the 0x58 invite packet.
-    No confirmation packet is sent back to the inviter.
-    """
-
-
-    # 1) Parse invitee name
-    payload = data[4:]
-    try:
-        br = BitReader(payload, debug=False)
-        invitee_name = br.read_method_13()
-    except Exception as e:
-        print(f"[{session.addr}] [PKT65] Parse error: {e}, raw={payload.hex()}")
-        return
-
-    print(f"[{session.addr}] [PKT65] Group invite from {session.current_character} to {invitee_name}")
-
-
-    # 2) Find the invitee’s session
-    invitee = next((
-        s for s in all_sessions
-        if s.authenticated
-           and s.current_character
-           and s.current_character.lower() == invitee_name.lower()
-    ), None)
-
-    if not invitee:
-        _send_error(session.conn, f"Player {invitee_name} not found")
-        print(f"[{session.addr}] [PKT65] Invitee {invitee_name} not found")
-        return
-
-    # 3) Ensure inviter has a group_id
-    if not getattr(session, 'group_id', None):
-        session.group_id = secrets.randbits(16)
-        session.group_members = [session]
-        print(f"[{session.addr}] [PKT65] Created group {session.group_id}")
-
-    # 4) Reject if invitee already in a group
-    if getattr(invitee, 'group_id', None):
-        _send_error(session.conn, f"{invitee_name} is already in a group")
-        print(f"[{session.addr}] [PKT65] {invitee_name} already in group {invitee.group_id}")
-        return
-
-    # 5) Send the invite (0x58) to the invitee only
-    bb = BitBuffer()
-    inviter_id   = session.clientEntID or 0
-    inviter_name = session.current_character
-    invite_text  = f"{inviter_name} has invited you to join a party"
-
-    bb.write_method_9(inviter_id)
-    bb.write_method_26(inviter_name)
-    bb.write_method_26(invite_text)
-    body = bb.to_bytes()
-    invite_packet = struct.pack(">HH", 0x58, len(body)) + body
-    invitee.conn.sendall(invite_packet)
-    print(f"[{session.addr}] [PKT65] Sent 0x58 invite to {invitee.current_character}")
 
 #TODO...
 def handle_linkupdater(session, data):

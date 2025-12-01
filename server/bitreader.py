@@ -175,5 +175,14 @@ class BitReader:
         bytes_val = struct.pack('>I', bits)
         return struct.unpack('>f', bytes_val)[0]
 
+    def read_method_236(self) -> int:
+        prefix = self.read_method_20(3)
+        bits_to_use = (prefix + 1) * 2
+
+        if self.bit_index + bits_to_use > len(self.data) * 8:
+            raise ValueError("Not enough data to read method_236 value")
+
+        return self.read_method_20(bits_to_use)
+
     def get_debug_log(self) -> List[str]:
         return self.debug_log
