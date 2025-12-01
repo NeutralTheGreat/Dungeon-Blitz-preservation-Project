@@ -10,6 +10,7 @@ from constants import GearType, EntType, class_64, class_1, DyeType, Entity, cla
 from BitBuffer import BitBuffer
 from constants import get_dye_color
 from globals import build_start_skit_packet, send_premium_purchase, _send_error
+from missions import get_mission_extra
 
 
 #TODO...
@@ -36,28 +37,94 @@ def handle_request_armory_gears(session, data, conn):
         print(f"[0xF4] Error parsing: {e}, raw={payload.hex()}")
 
 #TODO...
-def handle_talk_to_npc(session, data, all_sessions):
-    payload = data[4:]
-    br = BitReader(payload)
+def handle_talk_to_npc(session, data):
 
-    try:
-        npc_id = br.read_method_9()
-    except Exception as e:
-        print(f"[{session.addr}] [PKT0x7A] Failed to parse NPC ID: {e}")
-        return
+    br = BitReader(data[4:])
+    npc_id = br.read_method_9()
 
-    # Look up in session.entities (where NPCs are inserted on spawn)
     npc = session.entities.get(npc_id)
     if not npc:
-        print(f"[{session.addr}] [PKT0x7A] Unknown NPC id={npc_id}")
+        print(f"[{session.addr}] [PKT0x7A] Unknown NPC ID {npc_id}")
         return
 
-    npc_name = npc.get("name", f"NPC_{npc_id}")
-    print(f"[{session.addr}] [PKT0x7A] Talked to NPC {npc_id} ({npc_name})")
+    # NPC internal type name:
+    # This is the ONLY correct name to compare missions with.
+    ent_type = npc.get("Linked_Mission") or npc.get("entType") or npc.get("name")
 
-    # Build and send the skit packet to the interacting client only
-    skit_packet = build_start_skit_packet(npc_id, dialogue_id=0, mission_id=0)
-    session.conn.sendall(skit_packet)
+    # Normalize
+    def norm(x):
+        return (x or "").replace(" ", "").replace("_", "").lower()
+
+    npc_type_norm = norm(ent_type)
+
+    # Default values
+    dialogue_id = 0
+    mission_id = 0
+
+    # Player mission data
+    char_data = session.current_char_dict or {}
+    player_missions = char_data.get("missions", {})
+
+    # Check mission matches
+    for mid_str, mdata in player_missions.items():
+        try:
+            mid = int(mid_str)
+        except:
+            continue
+
+        mextra = get_mission_extra(mid)
+        if not mextra:
+            continue
+
+        # Mission-side names
+        contact = norm(mextra.get("ContactName"))
+        ret     = norm(mextra.get("ReturnName"))
+
+        # Normalize them BEFORE matching (auto-map via Linked_Mission)
+        if contact and contact != npc_type_norm:
+            # Allow Linked_Mission to solve mismatches
+            if norm(mextra.get("ContactName")) == norm(npc.get("Linked_Mission")):
+                contact = npc_type_norm
+        if ret and ret != npc_type_norm:
+            if norm(mextra.get("ReturnName")) == norm(npc.get("Linked_Mission")):
+                ret = npc_type_norm
+
+        # Mission state
+        state = mdata.get("state", 0)  # 0=not accepted, 1=active, 2=completed
+
+        # Match: Offering the mission
+        if npc_type_norm == contact:
+            if state == 0:
+                dialogue_id = 2  # OfferText
+                mission_id = 0
+                break
+            elif state == 1:
+                dialogue_id = 3  # ActiveText
+                mission_id = mid
+                break
+            elif state == 2:
+                dialogue_id = 5  # PraiseText
+                mission_id = mid
+                break
+
+        # Returning the mission
+        if npc_type_norm == ret:
+            if state == 1:
+                dialogue_id = 4  # ReturnText
+                mission_id = mid
+                break
+            elif state == 2:
+                dialogue_id = 5  # PraiseText
+                mission_id = mid
+                break
+
+    pkt = build_start_skit_packet(npc_id, dialogue_id, mission_id)
+    session.conn.sendall(pkt)
+
+    print(
+        f"[{session.addr}] [PKT0x7A] TalkToNPC id={npc_id} entType={ent_type} → "
+        f"dialogue_id={dialogue_id}, mission_id={mission_id}"
+    )
 
 #TODO...
 def handle_collect_hatched_egg(conn, char):

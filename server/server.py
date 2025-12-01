@@ -371,7 +371,7 @@ def handle_client(session: ClientSession):
             elif pkt == 0xA2:
                 handle_linkupdater(session, data)
             elif pkt == 0x7A:
-                handle_talk_to_npc(session, data, all_sessions)
+                handle_talk_to_npc(session, data)
             elif pkt == 0x65:
                 handle_group_invite(session, data, all_sessions)
             elif pkt == 0x8E:
