@@ -1,7 +1,8 @@
 import struct
+from time import sleep
 
 from BitBuffer import BitBuffer
-from constants import class_3, class_1, class_64, class_111, class_66
+from constants import class_3, class_1, class_64, class_111, class_66, GearType
 
 HOST = "127.0.0.1"
 PORTS = [8080]# Developer mode Port : 7498
@@ -216,3 +217,34 @@ def build_groupmate_map_packet(sess, x, y):
 
     body = bb.to_bytes()
     return struct.pack(">HH", 0x8C, len(body)) + body
+
+def send_deduct_sigils(session, amount):
+    bb = BitBuffer()
+    bb.write_method_4(amount)
+    pkt = struct.pack(">HH", 0x10F, len(bb.to_bytes())) + bb.to_bytes()
+    session.conn.sendall(pkt)
+
+def send_mount_reward(session, mount_id, suppress=False):
+    bb = BitBuffer()
+    bb.write_method_4(mount_id)
+    bb.write_method_11(1 if suppress else 0, 1)
+    payload = bb.to_bytes()
+    pkt = struct.pack(">HH", 0x36, len(payload)) + payload
+    session.conn.sendall(pkt)
+
+def send_gold_reward(session, amount, show_fx=False):
+    bb = BitBuffer()
+    bb.write_method_4(amount)
+    bb.write_method_11(1 if show_fx else 0, 1)
+    payload = bb.to_bytes()
+    pkt = struct.pack(">HH", 0x35, len(payload)) + payload
+    session.conn.sendall(pkt)
+
+def send_gear_reward(session, gear_id, tier=0, has_mods=False):
+    bb = BitBuffer()
+    bb.write_method_6(gear_id, GearType.GEARTYPE_BITSTOSEND)
+    bb.write_method_6(tier, GearType.const_176)
+    bb.write_method_11(1 if has_mods else 0, 1)
+    payload = bb.to_bytes()
+    pkt = struct.pack(">HH", 0x33, len(payload)) + payload
+    session.conn.sendall(pkt)
