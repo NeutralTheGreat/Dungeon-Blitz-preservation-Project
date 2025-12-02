@@ -22,7 +22,8 @@ from combat import handle_entity_destroy, handle_buff_tick_dot, handle_respawn_b
     handle_change_max_speed, handle_power_cast, handle_change_offset_y
 from buildings import handle_building_claim, handle_building_upgrade, handle_building_speed_up_request, handle_cancel_building_upgrade
 from socials import handle_zone_panel_request, handle_public_chat, handle_private_message, handle_room_thought, \
-    handle_start_skit, handle_emote_begin, handle_group_invite, handle_query_message_answer, handle_map_location_update
+    handle_start_skit, handle_emote_begin, handle_group_invite, handle_query_message_answer, handle_map_location_update, \
+    handle_group_kick, handle_group_leave, handle_group_leader, handle_send_group_chat
 from pets import handle_equip_pets, handle_mount_equip_packet
 from Commands import handle_gear_packet, handle_apply_dyes, handle_equip_rune, handle_change_look, handle_create_gearset, handle_name_gearset, \
     handle_apply_gearset, handle_update_equipment, PaperDoll_Request, handle_hp_increase_notice, handle_volume_enter, \
@@ -361,6 +362,14 @@ def handle_client(session: ClientSession):
                 handle_query_message_answer(session, data, all_sessions)
             elif pkt == 0x8b:
                 handle_map_location_update(session, data, all_sessions)
+            elif pkt == 0x67:
+                handle_group_kick(session, data, all_sessions)
+            elif pkt == 0x66:
+                handle_group_leave(session, data, all_sessions)
+            elif pkt == 0x68:
+                handle_group_leader(session, data, all_sessions)
+            elif pkt == 0x63:
+                handle_send_group_chat(session, data, all_sessions)
             ############################################
 
             # pets.py

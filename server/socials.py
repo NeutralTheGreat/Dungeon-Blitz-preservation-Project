@@ -6,7 +6,7 @@ from Character import load_characters
 from bitreader import BitReader
 from constants import Entity
 from globals import level_players, get_active_character_name, current_characters, build_room_thought_packet, \
-    _send_error, send_chat_status
+    _send_error, send_chat_status, build_empty_group_packet, build_group_chat_packet, build_groupmate_map_packet
 
 
 # Helpers
@@ -201,26 +201,31 @@ def handle_emote_begin(session, data, all_sessions):
 
 
 def handle_group_invite(session, data, all_sessions):
-    br = BitReader(data[4:], debug=False)
+    br = BitReader(data[4:])
     invitee_name = br.read_method_13()
 
     invitee = next((
         s for s in all_sessions
         if s.authenticated
-           and s.current_character
-           and s.current_character.lower() == invitee_name.lower()
+        and s.current_character
+        and s.current_character.lower() == invitee_name.lower()
     ), None)
 
     if not invitee:
         _send_error(session.conn, f"Player {invitee_name} not found")
         return
 
-    # Reject if invitee already in a group
-    if getattr(invitee, 'group_id', None):
-        _send_error(session.conn, f"{invitee_name} is already in a group")
+    # Prevent inviting yourself
+    if invitee is session:
+        _send_error(session.conn, "You cannot invite yourself.")
         return
 
-    # Send the invite popup
+    # Reject if invitee is in another party
+    if getattr(invitee, "group_id", None):
+        _send_error(session.conn, f"{invitee_name} is already in a party")
+        return
+
+    # Build invite popup packet
     bb = BitBuffer()
     inviter_id   = session.clientEntID or 0
     inviter_name = session.current_character
@@ -229,10 +234,12 @@ def handle_group_invite(session, data, all_sessions):
     bb.write_method_9(inviter_id)
     bb.write_method_26(inviter_name)
     bb.write_method_26(invite_text)
+
     body = bb.to_bytes()
     invite_packet = struct.pack(">HH", 0x58, len(body)) + body
 
     invitee.conn.sendall(invite_packet)
+
 
 
 def build_group_update_packet(members):
@@ -330,16 +337,6 @@ def handle_query_message_answer(session, data, all_sessions):
         except:
             pass
 
-def build_groupmate_map_packet(sess, x, y):
-    bb = BitBuffer()
-
-    # name of the player whose coords are being updated
-    bb.write_method_26(sess.current_character)
-    bb.write_method_91(x)
-    bb.write_method_91(y)
-
-    body = bb.to_bytes()
-    return struct.pack(">HH", 0x8C, len(body)) + body
 
 # client only sends this when the player is in a party
 def handle_map_location_update(session, data, all_sessions):
@@ -359,5 +356,211 @@ def handle_map_location_update(session, data, all_sessions):
         pkt = build_groupmate_map_packet(session, map_x, map_y)
         try:
             member.conn.sendall(pkt)
+        except:
+            pass
+
+def handle_group_kick(session, data, all_sessions):
+    br = BitReader(data[4:])
+    target_name = br.read_method_26()
+
+    if not getattr(session, "group_id", None) or not session.group_members:
+        send_chat_status(session, "You are not in a party.")
+        return
+
+    group = session.group_members
+    leader = group[0]
+
+    if session is not leader:
+        send_chat_status(session, "Only the party leader can kick members.")
+        return
+
+    target = next((s for s in group if s.current_character.lower() == target_name.lower()), None)
+    if not target:
+        send_chat_status(session, f"{target_name} is not in your party.")
+        return
+
+    if target is session:
+        send_chat_status(session, "You cannot kick yourself.")
+        return
+
+    group.remove(target)
+    target.group_id = None
+    target.group_members = []
+
+    send_chat_status(target, "You have been removed from the party.")
+    send_chat_status(session, f"You removed {target_name} from the party.")
+
+    if len(group) == 1:
+        lone = group[0]
+        lone.group_id = None
+        lone.group_members = []
+        try:
+            lone.conn.sendall(build_empty_group_packet())
+        except:
+            pass
+        try:
+            target.conn.sendall(build_empty_group_packet())
+        except:
+            pass
+        return
+
+    members = []
+    for s in group:
+        is_leader = (s is group[0])
+        members.append((s, is_leader))
+        s.group_members = group
+        s.group_id = session.group_id
+
+    pkt = build_group_update_packet(members)
+    for s, _ in members:
+        try:
+            s.conn.sendall(pkt)
+        except:
+            pass
+
+    try:
+        target.conn.sendall(build_empty_group_packet())
+    except:
+        pass
+
+def handle_group_leave(session, data, all_sessions):
+    if not getattr(session, "group_id", None) or not session.group_members:
+        send_chat_status(session, "You are not in a party.")
+        return
+
+    group = session.group_members
+    if session not in group:
+        session.group_id = None
+        session.group_members = []
+        send_chat_status(session, "You are not in a party.")
+        return
+
+    # Remove leaving player
+    group.remove(session)
+    old_gid = session.group_id
+    session.group_id = None
+    session.group_members = []
+
+    send_chat_status(session, "You left the party.")
+
+    try:
+        session.conn.sendall(build_empty_group_packet())
+    except:
+        pass
+
+    # ---------- PARTY DISBAND CONDITION ----------
+    if len(group) <= 1:
+        # Disband for the remaining member (if exists)
+        if group:
+            last = group[0]
+            last.group_id = None
+            last.group_members = []
+            try:
+                last.conn.sendall(build_empty_group_packet())
+            except:
+                pass
+        return
+    # --------------------------------------------
+
+    # Party still has 2+ members -> new leader is first
+    new_leader = group[0]
+
+    for m in group:
+        send_chat_status(m, f"{session.current_character} has left the party.")
+
+    # Rebuild packet for remaining members
+    members = []
+    for s in group:
+        is_leader = (s is new_leader)
+        members.append((s, is_leader))
+        s.group_members = group
+        s.group_id = old_gid
+
+    pkt = build_group_update_packet(members)
+    for s, _ in members:
+        try:
+            s.conn.sendall(pkt)
+        except:
+            pass
+
+
+def handle_group_leader(session, data, all_sessions):
+    br = BitReader(data[4:])
+    target_name = br.read_method_26()
+
+    # Must be in a party
+    if not getattr(session, "group_id", None) or not session.group_members:
+        send_chat_status(session, "You are not in a party.")
+        return
+
+    group = session.group_members
+    leader = group[0]
+
+    # Only leader may promote
+    if session is not leader:
+        send_chat_status(session, "Only the party leader can assign leadership.")
+        return
+
+    # Find target inside the party
+    target = next((s for s in group if s.current_character.lower() == target_name.lower()), None)
+    if not target:
+        send_chat_status(session, f"{target_name} is not in your party.")
+        return
+
+    if target is session:
+        send_chat_status(session, "You are already the leader.")
+        return
+
+    # Promote target
+    group.remove(target)
+    group.insert(0, target)
+
+    # Notify members
+    send_chat_status(session, f"You made {target_name} the party leader.")
+    send_chat_status(target, "You are now the party leader.")
+
+    for m in group:
+        if m not in (session, target):
+            send_chat_status(m, f"{target_name} is now the party leader.")
+
+    # Rebuild the group packet
+    members = []
+    for s in group:
+        is_leader = (s is group[0])
+        members.append((s, is_leader))
+        s.group_members = group
+        s.group_id = session.group_id
+
+    pkt = build_group_update_packet(members)
+
+    # Send to all
+    for s, _ in members:
+        try:
+            s.conn.sendall(pkt)
+        except:
+            pass
+
+def handle_send_group_chat(session, data, all_sessions):
+    br = BitReader(data[4:])
+    message = br.read_method_26()
+
+    if not message.strip():
+        return
+
+    # Must be in a party
+    if not getattr(session, "group_id", None) or not session.group_members:
+        send_chat_status(session, "You are not in a party.")
+        return
+
+    group = session.group_members
+    sender_name = session.current_character
+
+    pkt = build_group_chat_packet(sender_name, message)
+    print(f" [Group chat] {sender_name} Says : {message}")
+
+    # Send to ALL members including sender
+    for m in group:
+        try:
+            m.conn.sendall(pkt)
         except:
             pass

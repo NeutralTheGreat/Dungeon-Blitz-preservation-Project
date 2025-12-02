@@ -189,3 +189,30 @@ def build_change_offset_y_packet(entity_id: int, offset_y: int) -> bytes:
     bb.write_method_739(offset_y)
     payload = bb.to_bytes()
     return struct.pack(">HH", 0x7D, len(payload)) + payload
+
+
+def build_empty_group_packet():
+    bb = BitBuffer()
+    bb.write_method_15(False)  # no group
+    body = bb.to_bytes()
+    return struct.pack(">HH", 0x75, len(body)) + body
+
+
+def build_group_chat_packet(sender: str, message: str) -> bytes:
+    bb = BitBuffer()
+    bb.write_method_13(sender)
+    bb.write_method_13(message)
+    body = bb.to_bytes()
+    return struct.pack(">HH", 0x64, len(body)) + body
+
+
+def build_groupmate_map_packet(sess, x, y):
+    bb = BitBuffer()
+
+    # name of the player whose coords are being updated
+    bb.write_method_26(sess.current_character)
+    bb.write_method_91(x)
+    bb.write_method_91(y)
+
+    body = bb.to_bytes()
+    return struct.pack(">HH", 0x8C, len(body)) + body
