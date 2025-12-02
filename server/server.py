@@ -26,10 +26,11 @@ from socials import handle_zone_panel_request, handle_public_chat, handle_privat
     handle_start_skit, handle_emote_begin, handle_group_invite, handle_query_message_answer, handle_map_location_update, \
     handle_group_kick, handle_group_leave, handle_group_leader, handle_send_group_chat
 from pets import handle_equip_pets, handle_mount_equip_packet
-from Commands import handle_gear_packet, handle_apply_dyes, handle_equip_rune, handle_change_look, handle_create_gearset, handle_name_gearset, \
+from Commands import handle_gear_packet, handle_apply_dyes, handle_equip_rune, handle_change_look, \
+    handle_create_gearset, handle_name_gearset, \
     handle_apply_gearset, handle_update_equipment, PaperDoll_Request, handle_hp_increase_notice, handle_volume_enter, \
-    handle_lockbox_reward, handle_linkupdater, handle_collect_hatched_egg, handle_talk_to_npc, handle_char_regen, handle_request_armory_gears, handle_queue_potion
-
+    handle_lockbox_reward, handle_linkupdater, handle_collect_hatched_egg, handle_talk_to_npc, handle_char_regen, \
+    handle_request_armory_gears, handle_queue_potion, handle_alert_state_update
 
 #===========#
 
@@ -398,6 +399,8 @@ def handle_client(session: ClientSession):
 
             # commands.py
             ############################################
+            elif pkt == 0x113:
+                handle_alert_state_update(session, data)
             elif pkt == 0x19:
                 PaperDoll_Request(session, data, conn)
             elif pkt == 0xA2:
