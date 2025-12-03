@@ -4,7 +4,7 @@ import time
 
 from Character import save_characters, build_paperdoll_packet, SAVE_PATH_TEMPLATE
 from bitreader import BitReader
-from constants import GearType, EntType, class_64, class_1, DyeType, Entity, class_3, Game
+from constants import GearType, EntType, class_64, class_1, DyeType, Entity, class_3
 from BitBuffer import BitBuffer
 from constants import get_dye_color
 from globals import build_start_skit_packet, send_premium_purchase
@@ -16,17 +16,6 @@ def handle_queue_potion(session, data):
     br = BitReader(data[4:])
     queued_potion_id = br.read_method_20(class_3.const_69)
     #print(f"queued potion ID : {queued_potion_id}")
-
-def handle_alert_state_update(session, data):
-    br = BitReader(data[4:])
-    state_id = br.read_method_20(Game.const_646)
-    char = session.current_char_dict
-
-    old = char.get("alertState", 0)
-    new = old | state_id
-    char["alertState"] = new
-
-    save_characters(session.user_id, session.char_list)
 
 
 #TODO...

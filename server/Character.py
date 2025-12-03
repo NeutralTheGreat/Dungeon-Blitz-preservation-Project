@@ -4,7 +4,7 @@ import struct
 
 from BitBuffer import BitBuffer
 from bitreader import BitReader
-from constants import GearType, GEARTYPE_BITS
+from constants import GearType, GEARTYPE_BITS, Game
 
 # Hints Do not delete
 """
@@ -20,27 +20,6 @@ from constants import GearType, GEARTYPE_BITS
         ]
     }
   ]
-  "stats_by_building": {
-          "1": 10, # "Tome"
-          "2": 10, # "Forge"
-
-          "3": 10, # "JusticarTower"
-          "4": 10, # "SentinelTower"
-          "5": 10, # "TemplarTower"
-
-          "6": 10, # "FrostwardenTower"
-          "7": 10, # "FlameseerTower"
-          "8": 10, # "NecromancerTower"
-
-          "9": 10, # "ExecutionerTower"
-          "10": 10, # "ShadowwalkerTower"
-          "11": 10, # "SoulthiefTower"
-
-          "12": 0, # "Keep"
-          "13": 10 # "Barn"
-        },
-}
-
 """
 
 def load_class_template(class_name: str) -> dict:
@@ -186,3 +165,15 @@ def build_login_character_list_bitpacked(characters):
         buf.write_method_6(char["level"], 6)
     header = struct.pack(">HH", 0x15, len(buf.to_bytes()))
     return header + buf.to_bytes()
+
+
+def handle_alert_state_update(session, data):
+    br = BitReader(data[4:])
+    state_id = br.read_method_20(Game.const_646)
+    char = session.current_char_dict
+
+    old = char.get("alertState", 0)
+    new = old | state_id
+    char["alertState"] = new
+
+    save_characters(session.user_id, session.char_list)

@@ -6,6 +6,28 @@ from constants import find_building_data
 from globals import send_premium_purchase, send_building_complete_packet
 from scheduler import schedule_building_upgrade
 
+"""
+"stats_by_building": {
+          "1": 10, # "Tome"
+          "2": 10, # "Forge"
+
+          "3": 10, # "JusticarTower"
+          "4": 10, # "SentinelTower"
+          "5": 10, # "TemplarTower"
+
+          "6": 10, # "FrostwardenTower"
+          "7": 10, # "FlameseerTower"
+          "8": 10, # "NecromancerTower"
+
+          "9": 10, # "ExecutionerTower"
+          "10": 10, # "ShadowwalkerTower"
+          "11": 10, # "SoulthiefTower"
+
+          "12": 0, # "Keep"
+          "13": 10 # "Barn"
+        },
+"""
+
 def handle_building_upgrade(session, data):
     br = BitReader(data[4:], debug=True)
     building_id = br.read_method_20(5)
