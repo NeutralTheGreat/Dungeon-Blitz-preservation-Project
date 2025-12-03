@@ -131,7 +131,10 @@ def handle_login_character_create(session, data, conn):
     })
 
     session.char_list.append(new_char)
-    session.player_data["characters"] = session.char_list
+    session.player_data = {
+        "user_id": session.user_id,
+        "characters": session.char_list
+    }
 
     save_path = os.path.join(_SAVES_DIR, f"{session.user_id}.json")
     with open(save_path, "w", encoding="utf-8") as f:
@@ -227,7 +230,11 @@ def handle_character_select(session, data, conn):
         conn.sendall(pkt)
         pending_world[tk] = (c, current_level, prev_level)
 
-        session.player_data["characters"] = session.char_list
+        session.player_data = {
+            "user_id": session.user_id,
+            "characters": session.char_list
+        }
+
         save_path = os.path.join(_SAVES_DIR, f"{session.user_id}.json")
         with open(save_path, "w", encoding="utf-8") as f:
             json.dump(session.player_data, f, indent=2)
@@ -277,7 +284,11 @@ def handle_gameserver_login(session, data, conn):
     else:
         session.char_list.append(char)
 
-    session.player_data["characters"] = session.char_list
+    session.player_data = {
+        "user_id": session.user_id,
+        "characters": session.char_list
+    }
+
     save_path = os.path.join(_SAVES_DIR, f"{session.user_id}.json")
     with open(save_path, "w", encoding="utf-8") as f:
         json.dump(session.player_data, f, indent=2)
