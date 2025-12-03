@@ -17,6 +17,12 @@ def handle_queue_potion(session, data):
     queued_potion_id = br.read_method_20(class_3.const_69)
     #print(f"queued potion ID : {queued_potion_id}")
 
+# i have no clue what purpose does this payload serves
+def handle_badge_request(session, data, conn):
+    br = BitReader(data[4:])
+    badge_key = br.read_method_26()
+    print(f"[0x8D] Badge request: {badge_key}")
+
 
 #TODO...
 def handle_talk_to_npc(session, data):

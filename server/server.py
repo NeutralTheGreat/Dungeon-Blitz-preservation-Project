@@ -30,7 +30,7 @@ from Commands import handle_gear_packet, handle_apply_dyes, handle_equip_rune, h
     handle_create_gearset, handle_name_gearset, \
     handle_apply_gearset, handle_update_equipment, handle_hp_increase_notice, handle_volume_enter, \
     handle_lockbox_reward, handle_linkupdater, handle_collect_hatched_egg, handle_talk_to_npc, handle_char_regen, \
-    handle_queue_potion
+    handle_queue_potion, handle_badge_request
 
 #===========#
 
@@ -415,6 +415,8 @@ def handle_client(session: ClientSession):
 
             # commands.py
             ############################################
+            elif pkt == 0x8D:
+                handle_badge_request(session, data, conn)
             elif pkt == 0xA2:
                 handle_linkupdater(session, data)
             elif pkt == 0x7A:
