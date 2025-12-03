@@ -10,7 +10,7 @@ from globals import level_registry, session_by_token, all_sessions, char_tokens,
     PORTS, Client_Crash_Reports, handle_entity_destroy_server, pending_world
 from scheduler import set_active_session_resolver
 from static_server import start_static_server
-from Character import save_characters
+from Character import save_characters, handle_request_armory_gears
 
 from login import handle_login_version, handle_login_create, handle_login_authenticate, handle_login_character_create, handle_character_select, handle_gameserver_login
 from level_config import handle_open_door, handle_level_transfer_request, handle_request_door_state, LEVEL_CONFIG, handle_entity_incremental_update
@@ -30,7 +30,7 @@ from Commands import handle_gear_packet, handle_apply_dyes, handle_equip_rune, h
     handle_create_gearset, handle_name_gearset, \
     handle_apply_gearset, handle_update_equipment, PaperDoll_Request, handle_hp_increase_notice, handle_volume_enter, \
     handle_lockbox_reward, handle_linkupdater, handle_collect_hatched_egg, handle_talk_to_npc, handle_char_regen, \
-    handle_request_armory_gears, handle_queue_potion, handle_alert_state_update
+    handle_queue_potion, handle_alert_state_update
 
 #===========#
 
@@ -397,6 +397,12 @@ def handle_client(session: ClientSession):
                 handle_mount_equip_packet(session, data, all_sessions)
             ############################################
 
+            # Character.py
+            ############################################
+            elif pkt == 0xF4:
+                handle_request_armory_gears(session, data, conn)
+            ############################################
+
             # commands.py
             ############################################
             elif pkt == 0x113:
@@ -425,8 +431,6 @@ def handle_client(session: ClientSession):
                 handle_gear_packet(session, data)
             elif pkt == 0x30:
                 handle_update_equipment(session, data)
-            elif pkt == 0xF4:
-                handle_request_armory_gears(session, data, conn)
             elif pkt == 0x107:
                 handle_lockbox_reward(session, data)
             elif pkt == 0x7C:

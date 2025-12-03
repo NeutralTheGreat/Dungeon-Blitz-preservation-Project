@@ -2,8 +2,7 @@ import json, struct
 import random
 import time
 
-from Character import save_characters, build_paperdoll_packet, get_inventory_gears, \
-    build_level_gears_packet, SAVE_PATH_TEMPLATE
+from Character import save_characters, build_paperdoll_packet, SAVE_PATH_TEMPLATE
 from bitreader import BitReader
 from constants import GearType, EntType, class_64, class_1, DyeType, Entity, class_3, Game
 from BitBuffer import BitBuffer
@@ -29,22 +28,6 @@ def handle_alert_state_update(session, data):
 
     save_characters(session.user_id, session.char_list)
 
-def handle_request_armory_gears(session, data, conn):
-    payload = data
-    br = BitReader(payload[4:], debug=False)
-    try:
-        var_2744 = br.read_method_9()
-        print(f"[0xF4] Client sent var_2744={var_2744}, raw={payload.hex()}")
-
-        if session.current_character:
-            char = next((c for c in session.char_list if c["name"] == session.current_character), None)
-            if char:
-                gears_list = get_inventory_gears(char)
-                packet = build_level_gears_packet(gears_list)
-                conn.sendall(packet)
-                print(f"[0xF4] Sent 0xF5 Armory gear list ({len(gears_list)} items)")
-    except Exception as e:
-        print(f"[0xF4] Error parsing: {e}, raw={payload.hex()}")
 
 #TODO...
 def handle_talk_to_npc(session, data):

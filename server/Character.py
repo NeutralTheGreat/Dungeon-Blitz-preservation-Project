@@ -3,6 +3,7 @@ import json
 import struct
 
 from BitBuffer import BitBuffer
+from bitreader import BitReader
 from constants import GearType, GEARTYPE_BITS
 
 # Hints Do not delete
@@ -47,14 +48,28 @@ def load_class_template(class_name: str) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def build_level_gears_packet(gears_list: list[tuple[int, int]]) -> bytes:
+def build_level_gears_packet(gears: list[tuple[int, int]]) -> bytes:
     buf = BitBuffer()
-    buf.write_method_4(len(gears_list))  # Write number of gears
-    for gear_id, tier in gears_list:
-        buf.write_method_6(gear_id, GEARTYPE_BITS)  # 11 bits for gearID
-        buf.write_method_6(tier, GearType.const_176)  # 2 bits for tier
+    buf.write_method_4(len(gears))
+
+    for gear_id, tier in gears:
+        buf.write_method_6(gear_id, GEARTYPE_BITS)      # 11 bits
+        buf.write_method_6(tier, GearType.const_176)    # 2 bits
+
     payload = buf.to_bytes()
     return struct.pack(">HH", 0xF5, len(payload)) + payload
+
+def handle_request_armory_gears(session, data, conn):
+    br = BitReader(data[4:])
+    player_token = br.read_method_9()
+
+    char = session.current_char_dict
+
+    # Build and send the 0xF5 packet
+    gears = get_inventory_gears(char)
+    pkt = build_level_gears_packet(gears)
+    conn.sendall(pkt)
+
 
 def get_inventory_gears(char: dict) -> list[tuple[int, int]]:
     inventory_gears = char.get("inventoryGears", [])
