@@ -403,6 +403,8 @@ def handle_client(session: ClientSession):
                 handle_request_armory_gears(session, data, conn)
             elif pkt == 0x113:
                 handle_alert_state_update(session, data)
+            elif pkt == 0x19:
+                PaperDoll_Request(session, data, conn)
             ############################################
 
             # globals.py
@@ -413,8 +415,6 @@ def handle_client(session: ClientSession):
 
             # commands.py
             ############################################
-            elif pkt == 0x19:
-                PaperDoll_Request(session, data, conn)
             elif pkt == 0xA2:
                 handle_linkupdater(session, data)
             elif pkt == 0x7A:
