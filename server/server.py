@@ -13,6 +13,7 @@ from static_server import start_static_server
 from Character import save_characters, handle_request_armory_gears, handle_alert_state_update, PaperDoll_Request
 
 from login import handle_login_version, handle_login_create, handle_login_authenticate, handle_login_character_create, handle_character_select, handle_gameserver_login
+from dev import DEVFLAG_STANDALONE_CLIENT
 from level_config import handle_open_door, handle_level_transfer_request, handle_request_door_state, LEVEL_CONFIG, handle_entity_incremental_update
 from Forge import handle_forge_speed_up_packet, handle_start_forge, handle_collect_forge_charm, handle_cancel_forge, handle_use_forge_xp_consumable, handle_allocate_magic_forge_artisan_skill_points, handle_magic_forge_reroll
 from talent import handle_respec_talent_tree, handle_allocate_talent_tree_points, handle_talent_claim, handle_talent_speedup, handle_train_talent_point, handle_clear_talent_research, handle_active_talent_change_request
@@ -249,6 +250,12 @@ def handle_client(session: ClientSession):
                 handle_character_select(session, data, conn)
             elif pkt == 0x1f:  # Welcome / Player_Data (finalize level transfer and spawn NPCs)
                 handle_gameserver_login(session, data, conn)
+            ############################################
+
+            # dev.py
+            ############################################
+            elif pkt == 0x1E:
+                DEVFLAG_STANDALONE_CLIENT(session, data, conn)
             ############################################
 
             # level_config.py
