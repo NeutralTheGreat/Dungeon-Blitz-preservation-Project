@@ -500,7 +500,7 @@ def ensure_level_npcs(level_name):
             for npc in npcs:
                 npc_map[npc["id"]] = npc
             level_npcs[level_name] = npc_map
-            print(f"[LEVEL] Spawned {len(npc_map)} NPCs for {level_name}")
+            #print(f"[LEVEL] Spawned {len(npc_map)} NPCs for {level_name}")
         except Exception as e:
             print(f"[LEVEL] Error loading NPCs for {level_name}: {e}")
             level_npcs[level_name] = {}
