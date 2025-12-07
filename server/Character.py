@@ -96,18 +96,19 @@ def load_characters(user_id: str) -> list[dict]:
     return data.get("characters", [])
 
 
-def save_characters(user_id: str, char_list: list[dict]):
-    """Save all characters for a user_id in the new format."""
-    os.makedirs(CHAR_SAVE_DIR, exist_ok=True)
-    path = os.path.join(CHAR_SAVE_DIR, f"{user_id}.json")
+def save_characters(user_id, chars):
+    final_path = os.path.join(CHAR_SAVE_DIR, f"{user_id}.json")
+    tmp_path = final_path + ".tmp"
 
     data = {
         "user_id": user_id,
-        "characters": char_list
+        "characters": chars
     }
 
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+    os.replace(tmp_path, final_path)
 
 
 def build_paperdoll_packet(char):
