@@ -297,7 +297,10 @@ class class_13:
       const_949 = 3
 
 class class_16:
+      const_1251 = 4
       const_167 = 6
+      const_644 = [0, 5000, 25000, 50000, 75000, 250000, 500000, 750000]
+      const_600 = [0, 3, 13, 25, 37, 60, 94, 119]
 
 class class_66:
     const_465 = 3

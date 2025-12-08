@@ -2,8 +2,9 @@ import time
 
 from Character import save_characters
 from bitreader import BitReader
-from constants import class_20, class_7
-from globals import build_hatchery_packet, pick_daily_eggs, send_premium_purchase, send_pet_training_complete
+from constants import class_20, class_7, class_16, Game, EGG_TYPES
+from globals import build_hatchery_packet, pick_daily_eggs, send_premium_purchase, send_pet_training_complete, \
+    send_gold_reward
 from scheduler import schedule_pet_training
 
 
@@ -24,6 +25,33 @@ def get_pet_training_idol_cost(rank):
     if rank < len(class_7.const_650):
         return class_7.const_650[rank]
     return 0
+
+def get_egg_gold_cost(slot_index: int) -> int:
+    if 0 <= slot_index < len(class_16.const_644):
+        return class_16.const_644[slot_index]
+    return 0
+
+def get_egg_idol_cost(slot_index: int) -> int:
+    if 0 <= slot_index < len(class_16.const_600):
+        return class_16.const_600[slot_index]
+    return 0
+
+def get_egg_hatch_time(egg_rank: int, first_pet: bool) -> int:
+    if first_pet:
+        return Game.const_181  # 180 seconds
+
+    # class_16.const_303 = 0, const_376 = 1
+    if egg_rank == 0:
+        return 259200   # 3 days
+    if egg_rank == 1:
+        return 518400   # 6 days
+    return 864000       # 10 days
+
+def find_egg_def(egg_id: int):
+    for e in EGG_TYPES:
+        if e.get("EggID") == egg_id:
+            return e
+    return None
 
 ##############################################################
 
@@ -205,3 +233,49 @@ def handle_pet_speed_up(session, data):
     save_characters(session.user_id, session.char_list)
     send_pet_training_complete(session, pet_type)
 
+def handle_egg_hatch(session, data):
+    br = BitReader(data[4:])
+
+    slot_index = br.read_method_20(class_16.const_1251)
+    use_idols  = br.read_method_15()
+
+    char = session.current_char_dict
+    owned = char.get("OwnedEggsID", [])
+
+    # Determine which egg type is in this slot
+    egg_type_id = owned[slot_index]
+    egg_def = find_egg_def(egg_type_id)
+    if not egg_def:
+        print(f"[EGG] Unknown egg type ID: {egg_type_id}")
+        return
+
+    # Cost calculation per slot index
+    gold_cost = get_egg_gold_cost(slot_index)
+    idol_cost = get_egg_idol_cost(slot_index)
+
+    # Apply currency cost
+    if use_idols:
+        current_idols = char.get("mammothIdols", 0)
+        char["mammothIdols"] = current_idols - idol_cost
+        send_premium_purchase(session, "Hatch Egg", idol_cost)
+    else:
+        current_gold = char.get("gold", 0)
+        char["gold"] = current_gold - gold_cost
+
+    # Compute hatch duration (class_16.method_467)
+    egg_rank = egg_def.get("EggRank", 0)   # corresponds to var_392
+    # first pet is free because of the tutorial
+    has_pets = bool(char.get("OwnedPets", []))
+    duration = get_egg_hatch_time(egg_rank, first_pet=not has_pets)
+
+    now = int(time.time())
+    ready_time = now + duration
+
+    char["EggHachery"] = {
+        "EggID": egg_type_id,
+        "ReadyTime": ready_time,
+        "done": False,
+        "slotIndex": slot_index,  # we may need this leaving it here just in case
+    }
+    char["activeEggCount"] = 1
+    save_characters(session.user_id, session.char_list)
