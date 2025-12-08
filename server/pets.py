@@ -3,7 +3,7 @@ import time
 from Character import save_characters
 from bitreader import BitReader
 from constants import class_20, class_7
-from globals import build_hatchery_packet, pick_daily_eggs, send_premium_purchase
+from globals import build_hatchery_packet, pick_daily_eggs, send_premium_purchase, send_pet_training_complete
 from scheduler import schedule_pet_training
 
 
@@ -185,3 +185,23 @@ def handle_pet_training_cancel(session, data):
         "trainingTime": 0
     }]
     save_characters(session.user_id, session.char_list)
+
+def handle_pet_speed_up(session, data):
+    br = BitReader(data[4:])
+    idol_cost = br.read_method_9()
+
+    char = session.current_char_dict
+    tp_list = char.get("trainingPet", [])
+
+    current_idols = char.get("mammothIdols", 0)
+    char["mammothIdols"] = current_idols - idol_cost
+    save_characters(session.user_id, session.char_list)
+    send_premium_purchase(session, "Pet Training Speedup", idol_cost)
+
+    tp = tp_list[0]
+    pet_type = tp["typeID"]
+    tp["trainingTime"] = 0
+
+    save_characters(session.user_id, session.char_list)
+    send_pet_training_complete(session, pet_type)
+
