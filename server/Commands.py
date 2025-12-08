@@ -672,10 +672,6 @@ def handle_char_regen(session, data):
     regen_amount = br.read_method_24()
     print(f"entity id : {ent_id} : regen_amount : {regen_amount} ")
 
-def handle_volume_enter(session, data):
-     pass
-
-
 #handled
 #############################################
 
