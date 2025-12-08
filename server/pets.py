@@ -3,8 +3,7 @@ import time
 from Character import save_characters
 from bitreader import BitReader
 from constants import class_20, class_7, class_16, Game, EGG_TYPES
-from globals import build_hatchery_packet, pick_daily_eggs, send_premium_purchase, send_pet_training_complete, \
-    send_gold_reward
+from globals import build_hatchery_packet, pick_daily_eggs, send_premium_purchase, send_pet_training_complete, send_egg_hatch_start
 from scheduler import schedule_pet_training
 
 
@@ -279,3 +278,23 @@ def handle_egg_hatch(session, data):
     }
     char["activeEggCount"] = 1
     save_characters(session.user_id, session.char_list)
+
+def handle_egg_speed_up(session, data):
+    br = BitReader(data[4:])
+    idol_cost_client = br.read_method_9()
+
+    char = session.current_char_dict
+
+    egg_data = char.get("EggHachery")
+
+    egg_id = egg_data["EggID"]
+    current_idols = char.get("mammothIdols", 0)
+
+    char["mammothIdols"] = current_idols - idol_cost_client
+    send_premium_purchase(session, "Egg Hatch Speedup", idol_cost_client)
+
+    egg_data["ReadyTime"] = 0   # 0 == finished (client logic)
+    egg_data["done"] = False
+
+    save_characters(session.user_id, session.char_list)
+    send_egg_hatch_start(session)

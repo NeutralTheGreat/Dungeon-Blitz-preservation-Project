@@ -292,3 +292,16 @@ def send_pet_training_complete(session, type_id):
     body = bb.to_bytes()
     pkt = struct.pack(">HH", 0xEE, len(body)) + body
     session.conn.sendall(pkt)
+
+def send_egg_hatch_start(session):
+    egg_data = session.current_char_dict.get("EggHachery")
+    egg_id = egg_data["EggID"]
+
+    bb = BitBuffer()
+    bb.write_method_6(egg_id, class_16.const_167)
+
+    body = bb.to_bytes()
+    pkt = struct.pack(">HH", 0xE7, len(body)) + body
+    session.conn.sendall(pkt)
+
+    print(f"[EGG] Sent hatch-start packet for egg {egg_id}")
