@@ -3,7 +3,7 @@ import struct
 import time
 
 from BitBuffer import BitBuffer
-from constants import class_3, class_1, class_64, class_111, class_66, GearType, EGG_TYPES, class_16
+from constants import class_3, class_1, class_64, class_111, class_66, GearType, EGG_TYPES, class_16, class_7
 
 HOST = "127.0.0.1"
 PORTS = [8080]# Developer mode Port : 7498
@@ -283,3 +283,12 @@ def pick_daily_eggs(count=3):
 
     chosen = random.sample(valid, count)
     return [e["EggID"] for e in chosen]
+
+def send_pet_training_complete(session, type_id):
+    bb = BitBuffer()
+    bb.write_method_6(type_id, class_7.const_19)
+    bb.write_method_4(int(time.time()))
+
+    body = bb.to_bytes()
+    pkt = struct.pack(">HH", 0xEE, len(body)) + body
+    session.conn.sendall(pkt)

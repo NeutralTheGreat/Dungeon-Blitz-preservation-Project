@@ -2,9 +2,28 @@ import time
 
 from Character import save_characters
 from bitreader import BitReader
-from constants import class_20
-from globals import build_hatchery_packet, pick_daily_eggs
+from constants import class_20, class_7
+from globals import build_hatchery_packet, pick_daily_eggs, send_premium_purchase
 
+# Helpers
+##############################################################
+
+def get_pet_training_time(rank):
+    if rank < len(class_7.const_797):
+        return class_7.const_797[rank]
+    return 0
+
+def get_pet_training_gold_cost(rank):
+    if rank < len(class_7.const_685):
+        return class_7.const_685[rank]
+    return 0
+
+def get_pet_training_idol_cost(rank):
+    if rank < len(class_7.const_650):
+        return class_7.const_650[rank]
+    return 0
+
+##############################################################
 
 def handle_equip_pets(session, data, all_sessions):
     reader = BitReader(data[4:])
@@ -94,3 +113,36 @@ def handle_request_hatchery_eggs(session, data):
     char["EggNotifySent"] = False
     packet = build_hatchery_packet(owned, reset_time)
     session.conn.sendall(packet)
+
+def handle_train_pet(session, data):
+    br = BitReader(data[4:])
+
+    type_id    = br.read_method_6(class_7.const_19)
+    unique_id  = br.read_method_9()
+    next_rank  = br.read_method_6(class_7.const_75)
+    use_idols  = br.read_method_15()
+
+    char = session.current_char_dict
+
+    train_time = get_pet_training_time(next_rank)
+    gold_cost  = get_pet_training_gold_cost(next_rank)
+    idol_cost  = get_pet_training_idol_cost(next_rank)
+
+    if use_idols:
+        current = char.get("mammothIdols", 0)
+        char["mammothIdols"] = current - idol_cost
+        send_premium_purchase(session, "Pet Training", idol_cost)
+
+    else:
+        current = char.get("gold", 0)
+        char["gold"] = current - gold_cost
+
+    ready_at = int(time.time()) + train_time
+
+    char["trainingPet"] = [{
+        "typeID": type_id,
+        "special_id": unique_id,
+        "trainingTime": ready_at
+    }]
+
+    save_characters(session.user_id, session.char_list)
