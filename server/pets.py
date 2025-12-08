@@ -264,8 +264,8 @@ def handle_egg_hatch(session, data):
 
     # Compute hatch duration (class_16.method_467)
     egg_rank = egg_def.get("EggRank", 0)   # corresponds to var_392
-    # first pet is free because of the tutorial
-    has_pets = bool(char.get("OwnedPets", []))
+    # first egg hatch is always 3 minutes because of the tutorial
+    has_pets = bool(char.get("pets", []))
     duration = get_egg_hatch_time(egg_rank, first_pet=not has_pets)
 
     now = int(time.time())
