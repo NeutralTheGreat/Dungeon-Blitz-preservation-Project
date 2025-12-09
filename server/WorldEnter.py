@@ -453,10 +453,15 @@ def Player_Data_Packet(char: dict,
             buf.write_method_11(0, 1)
 
         # ──────────────(Owned Eggs)──────────────
-        eggPetIDs = char.get("OwnedEggsID", [])
-        buf.write_method_6(len(eggPetIDs), class_16_const_167)
-        for eid in eggPetIDs:
-            buf.write_method_6(eid, class_16_const_167)
+        MAX_SLOTS = class_16.const_1290
+
+        eggs = char.get("OwnedEggsID", [])
+        trimmed = eggs[:MAX_SLOTS]
+        padded = trimmed + [0] * (MAX_SLOTS - len(trimmed))
+
+        buf.write_method_6(MAX_SLOTS, class_16.const_167)
+        for eid in padded:
+            buf.write_method_6(eid, class_16.const_167)
 
         # ──────────────(Active Egg Count)──────────────
         activeEggCount = char.get("activeEggCount", 0)
