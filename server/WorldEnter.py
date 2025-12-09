@@ -17,7 +17,6 @@ from constants import (
     class_111_const_432,
     class_64_const_218,
     class_9_const_129,
-    class_16_const_167,
     class_7_const_19,
     NEWS_EVENTS,
     GAME_CONST_209,
