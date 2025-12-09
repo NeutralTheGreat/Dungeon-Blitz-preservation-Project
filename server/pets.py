@@ -348,3 +348,15 @@ def handle_collect_hatched_egg(session, data):
     # Send updated hatchery packet so client refreshes barn
     hatch_packet = build_hatchery_packet(owned_eggs, char.get("EggResetTime", 0))
     session.conn.sendall(hatch_packet)
+
+def handle_cancel_egg_hatch(session, data):
+    char = session.current_char_dict
+
+    char["EggHachery"] = {
+        "EggID": 0,
+        "ReadyTime": 0,
+        "slotIndex": 0,
+    }
+    char["activeEggCount"] = 0
+
+    save_characters(session.user_id, session.char_list)
