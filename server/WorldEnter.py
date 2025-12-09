@@ -26,6 +26,7 @@ from constants import (
     NUM_TALENT_SLOTS,
     GEARTYPE_BITS,
     class_119, class_111, class_9, class_66, MASTERCLASS_TO_BUILDING, class_21, Game, Mission, Entity, class_7,
+    class_16,
 )
 from globals import all_sessions
 from missions import get_total_mission_defs, get_mission_def
@@ -433,14 +434,23 @@ def Player_Data_Packet(char: dict,
             buf.write_method_4(tr.get("ReadyTime", 0))
 
         # ──────────────(EggHachery)──────────────
-        egg_data = char.get("EggHachery")
-        if egg_data:
-            buf.write_method_11(1, 1)
-            buf.write_method_6(egg_data["EggID"], class_16_const_167)
-            if egg_data.get("done", False):
+        egg_data = char.get("EggHachery", {})
+
+        if egg_data and egg_data.get("EggID", 0) != 0:
+            egg_id = egg_data.get("EggID", 0)
+            ready_time = egg_data.get("ReadyTime", 0)
+            now = int(time.time())
+
+            buf.write_method_11(1, 1)  # EggHachery exists
+            buf.write_method_6(egg_id, class_16.const_167)
+
+            # If hatch time has passed, send 0 so client moves to "Ready to collect"
+            if ready_time != 0 and ready_time <= now:
                 buf.write_method_4(0)
             else:
-                buf.write_method_4(egg_data.get("ReadyTime", 0))
+                buf.write_method_4(ready_time)
+        else:
+            buf.write_method_11(0, 1)
 
         # ──────────────(Owned Eggs)──────────────
         eggPetIDs = char.get("OwnedEggsID", [])
