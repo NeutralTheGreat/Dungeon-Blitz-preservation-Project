@@ -5,7 +5,7 @@ from bitreader import BitReader
 from constants import class_20, class_7, class_16, Game, EGG_TYPES, PET_TYPES
 from globals import build_hatchery_packet, pick_daily_eggs, send_premium_purchase, send_pet_training_complete, \
     send_egg_hatch_start, send_new_pet_packet
-from scheduler import schedule_pet_training
+from scheduler import schedule_pet_training, schedule_egg_hatch
 
 
 # Helpers
@@ -274,11 +274,11 @@ def handle_egg_hatch(session, data):
     char["EggHachery"] = {
         "EggID": egg_type_id,
         "ReadyTime": ready_time,
-        "done": False,
         "slotIndex": slot_index,
     }
     char["activeEggCount"] = 1
     save_characters(session.user_id, session.char_list)
+    schedule_egg_hatch(session.user_id, session.current_character, ready_time)
 
 def handle_egg_speed_up(session, data):
     br = BitReader(data[4:])
@@ -295,7 +295,6 @@ def handle_egg_speed_up(session, data):
     send_premium_purchase(session, "Egg Hatch Speedup", idol_cost_client)
 
     egg_data["ReadyTime"] = 0   # 0 == finished (client logic)
-    egg_data["done"] = False
 
     save_characters(session.user_id, session.char_list)
     send_egg_hatch_start(session)
@@ -337,7 +336,6 @@ def handle_collect_hatched_egg(session, data):
     char["EggHachery"] = {
         "EggID":    0,
         "ReadyTime": 0,
-        "done":      False,
         "slotIndex": 0,
     }
     char["activeEggCount"] = 0

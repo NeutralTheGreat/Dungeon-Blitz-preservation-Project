@@ -11,7 +11,8 @@ from BitBuffer import BitBuffer
 from Character import save_characters, load_characters, CHAR_SAVE_DIR
 from constants import class_111, class_64_const_218, class_1
 from globals import send_skill_complete_packet, send_building_complete_packet, send_forge_reroll_packet, \
-    send_talent_point_research_complete, all_sessions, build_hatchery_notify_packet, send_pet_training_complete
+    send_talent_point_research_complete, all_sessions, build_hatchery_notify_packet, send_pet_training_complete, \
+    send_egg_hatch_start
 
 active_session_resolver = None
 
@@ -316,6 +317,34 @@ def _on_pet_training_done(user_id: str, char_name: str):
 def schedule_pet_training(user_id: str, char_name: str, ready_ts: int):
     scheduler.schedule(run_at=ready_ts,callback=lambda uid=user_id, cn=char_name:_on_pet_training_done(uid, cn))
 
+def _on_egg_hatch_done(user_id: str, char_name: str):
+    chars = load_characters(user_id)
+    char = next((c for c in chars if c.get("name") == char_name), None)
+    if not char:
+        return
+
+    egg = char.get("EggHachery")
+    if not egg or egg.get("EggID", 0) == 0:
+        return
+
+    ready_ts = egg.get("ReadyTime", 0)
+    now = int(time.time())
+
+    # Still not finished? (scheduler may fire early)
+    if ready_ts > now:
+        return
+    save_characters(user_id, chars)
+
+    # Notify if the player is online
+    if active_session_resolver:
+        session = active_session_resolver(user_id, char_name)
+        if session and session.authenticated:
+           send_egg_hatch_start(session)
+
+
+def schedule_egg_hatch(user_id: str, char_name: str, ready_ts: int):
+    scheduler.schedule(run_at=ready_ts,callback=lambda uid=user_id, cn=char_name:_on_egg_hatch_done(uid, cn))
+
 def boot_scan_all_saves():
     now = int(time.time())
     for path in glob.glob(os.path.join(CHAR_SAVE_DIR, "*.json")):
@@ -399,6 +428,14 @@ def boot_scan_all_saves():
                     dirty = True
                 else:
                     schedule_pet_training(user_id, char["name"], ts)
+
+            egg_ht = char.get("EggHachery")
+            if egg_ht:
+                rt = egg_ht.get("ReadyTime", 0)
+                if rt <= now:
+                    pass
+                else:
+                    schedule_egg_hatch(user_id, char["name"], rt)
 
         if dirty:
             with open(path, "w", encoding="utf-8") as f:

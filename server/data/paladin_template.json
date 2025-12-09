@@ -8860,8 +8860,7 @@
     },
     "EggHachery": {
         "EggID": 0,
-        "ReadyTime": 0,
-        "done": true
+        "ReadyTime": 0
     },
     "OwnedEggsID": [
         1,
