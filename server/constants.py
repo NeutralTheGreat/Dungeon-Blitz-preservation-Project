@@ -297,6 +297,7 @@ class class_13:
       const_949 = 3
 
 class class_16:
+      const_1290 = 8
       const_1251 = 4
       const_167 = 6
       const_644 = [0, 5000, 25000, 50000, 75000, 250000, 500000, 750000]
@@ -364,6 +365,7 @@ BUILDING_DATA = _load_json(os.path.join(DATA_DIR, "BuildingTypes.json"), [])
 CHARM_DB      = {int(c["CharmID"]): c for c in _load_json(os.path.join(DATA_DIR, "Charms.json"), [])}
 CONSUMABLES   = _load_json(os.path.join(DATA_DIR, "ConsumableTypes.json"), [])
 EGG_TYPES     = _load_json(os.path.join(DATA_DIR, "egg_types.json"), [])
+PET_TYPES     = _load_json(os.path.join(DATA_DIR, "pet_types.json"), [])
 
 CONSUMABLE_BOOSTS = {
     int(c.get("ConsumableID", 0)): {

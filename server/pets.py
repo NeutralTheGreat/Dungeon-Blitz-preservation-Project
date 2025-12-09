@@ -2,8 +2,9 @@ import time
 
 from Character import save_characters
 from bitreader import BitReader
-from constants import class_20, class_7, class_16, Game, EGG_TYPES
-from globals import build_hatchery_packet, pick_daily_eggs, send_premium_purchase, send_pet_training_complete, send_egg_hatch_start
+from constants import class_20, class_7, class_16, Game, EGG_TYPES, PET_TYPES
+from globals import build_hatchery_packet, pick_daily_eggs, send_premium_purchase, send_pet_training_complete, \
+    send_egg_hatch_start, send_new_pet_packet
 from scheduler import schedule_pet_training
 
 
@@ -274,7 +275,7 @@ def handle_egg_hatch(session, data):
         "EggID": egg_type_id,
         "ReadyTime": ready_time,
         "done": False,
-        "slotIndex": slot_index,  # we may need this leaving it here just in case
+        "slotIndex": slot_index,
     }
     char["activeEggCount"] = 1
     save_characters(session.user_id, session.char_list)
@@ -301,4 +302,49 @@ def handle_egg_speed_up(session, data):
 
 
 def handle_collect_hatched_egg(session, data):
-      pass
+    char = session.current_char_dict
+    egg_data = char.get("EggHachery")
+    egg_id = egg_data["EggID"]
+
+    pet_def = next((p for p in PET_TYPES if p.get("PetID") == egg_id), None)
+    if not pet_def:
+        print(f"[EGG] ERROR: No pet definition for EggID/PetID={egg_id}")
+        return
+
+    pet_type_id   = pet_def["PetID"]
+    starting_rank = 1
+
+    pets = char.get("pets", [])
+    special_id = max((p.get("special_id", 0) for p in pets), default=0) + 1
+
+    new_pet = {
+        "typeID":     pet_type_id,
+        "special_id": special_id,
+        "level":      starting_rank,
+        "xp":         0,
+    }
+
+    pets.append(new_pet)
+    char["pets"] = pets
+
+    # Remove the egg from OwnedEggsID at that slot
+    owned_eggs = char.get("OwnedEggsID", [])
+    slot_index = egg_data.get("slotIndex", None)
+
+    if slot_index is not None and 0 <= slot_index < len(owned_eggs):
+        removed = owned_eggs.pop(slot_index)
+
+    char["EggHachery"] = {
+        "EggID":    0,
+        "ReadyTime": 0,
+        "done":      False,
+        "slotIndex": 0,
+    }
+    char["activeEggCount"] = 0
+
+    save_characters(session.user_id, session.char_list)
+    send_new_pet_packet(session, pet_type_id, special_id, starting_rank)
+
+    # Send updated hatchery packet so client refreshes barn
+    hatch_packet = build_hatchery_packet(owned_eggs, char.get("EggResetTime", 0))
+    session.conn.sendall(hatch_packet)

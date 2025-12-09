@@ -254,11 +254,15 @@ def send_gear_reward(session, gear_id, tier=0, has_mods=False):
 def build_hatchery_packet(eggs: list[int], reset_time: int):
     bb = BitBuffer()
 
-    # Count
-    bb.write_method_6(len(eggs), class_16.const_167)
+    max_slots = class_16.const_1290
+    trimmed = (eggs or [])[:max_slots]
+    padded  = trimmed + [0] * (max_slots - len(trimmed))
 
-    # Egg IDs
-    for eid in eggs:
+    # Send the fixed count so client builds a Vector<uint> of that length
+    bb.write_method_6(max_slots, class_16.const_167)
+
+    # Egg IDs (0 means empty slot)
+    for eid in padded:
         bb.write_method_6(eid, class_16.const_167)
 
     # Reset timestamp
@@ -305,3 +309,16 @@ def send_egg_hatch_start(session):
     session.conn.sendall(pkt)
 
     print(f"[EGG] Sent hatch-start packet for egg {egg_id}")
+
+def send_new_pet_packet(session, type_id, special_id, rank):
+    bb = BitBuffer()
+    bb.write_method_6(type_id, class_7.const_19)
+    bb.write_method_4(special_id)
+    bb.write_method_6(rank, class_7.const_75)
+    bb.write_method_15(True)  # isNew = true
+
+    body = bb.to_bytes()
+    pkt = struct.pack(">HH", 0x37, len(body)) + body
+    session.conn.sendall(pkt)
+
+    print(f"[PET] Sent NEW PET : type={type_id}, special_id={special_id}, rank={rank}")
