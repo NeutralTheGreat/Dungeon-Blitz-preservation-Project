@@ -10,7 +10,6 @@ from constants import (
     class_10_const_665,
     CLASS_NAME_TO_ID,
     class_64,
-    class_64_const_499,
     class_111_const_432,
     class_64_const_218,
     class_7_const_19,
@@ -385,7 +384,7 @@ def Player_Data_Packet(char: dict,
             else:
                 buf.write_method_11(0, 1)
                 var_8 = mf.get("secondary_tier", 0)
-                buf.write_method_6(var_8, class_64_const_499)
+                buf.write_method_6(var_8, class_64.const_499)
                 if var_8:
                     buf.write_method_6(mf.get("secondary", 0), class_64_const_218)
                     buf.write_method_6(mf.get("usedlist", 0), class_111_const_432)
