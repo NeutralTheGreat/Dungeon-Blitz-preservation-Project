@@ -115,7 +115,6 @@ def handle_talk_to_npc(session, data):
     )
 
 REWARD_TYPES = ['gear', 'item', 'gold', 'chest', 'xp', 'potion']
-GEARTYPE_BITS = GearType.GEARTYPE_BITSTOSEND  # e.g. 5
 
 def build_loot_drop_packet(entity_id: int, x: int, y: int,
                            reward_type: str, value1: int=0, value2: int=0) -> bytes:
@@ -141,8 +140,8 @@ def build_loot_drop_packet(entity_id: int, x: int, y: int,
         bb.write_method_11(bit, 1)
         if bit:
             if rt == 'gear':
-                bb.write_method_6(value1, GEARTYPE_BITS)
-                bb.write_method_6(value2, GEARTYPE_BITS)
+                bb.write_method_6(value1, GearType.GEARTYPE_BITSTOSEND)
+                bb.write_method_6(value2, GearType.GEARTYPE_BITSTOSEND)
             else:
                 bb.write_method_4(value1)
             break

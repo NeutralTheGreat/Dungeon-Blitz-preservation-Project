@@ -4,7 +4,7 @@ import struct
 
 from BitBuffer import BitBuffer
 from bitreader import BitReader
-from constants import GearType, GEARTYPE_BITS, Game
+from constants import GearType, Game
 
 # Hints Do not delete
 """
@@ -32,7 +32,7 @@ def build_level_gears_packet(gears: list[tuple[int, int]]) -> bytes:
     buf.write_method_4(len(gears))
 
     for gear_id, tier in gears:
-        buf.write_method_6(gear_id, GEARTYPE_BITS)      # 11 bits
+        buf.write_method_6(gear_id, GearType.GEARTYPE_BITSTOSEND)      # 11 bits
         buf.write_method_6(tier, GearType.const_176)    # 2 bits
 
     payload = buf.to_bytes()
@@ -136,7 +136,7 @@ def build_paperdoll_packet(char):
             elif isinstance(slot, (list, tuple)):
                 gear_id = int(slot[0]) if slot else 0
 
-        buf.write_method_6(gear_id, GEARTYPE_BITS)
+        buf.write_method_6(gear_id, GearType.GEARTYPE_BITSTOSEND)
 
     return buf.to_bytes()
 

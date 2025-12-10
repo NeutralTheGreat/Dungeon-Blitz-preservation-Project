@@ -9,7 +9,6 @@ from constants import (
     class_64,
     NEWS_EVENTS,
     SLOT_BIT_WIDTHS,
-    GEARTYPE_BITS,
     class_119, class_111, class_9, class_66, MASTERCLASS_TO_BUILDING, class_21, Game, Mission, Entity, class_7,
     class_16, class_118, class_1, class_10,
 )
@@ -527,7 +526,7 @@ def Player_Data_Packet(char: dict,
         gear_id = gear.get("gearID", 0)
         if gear_id:
             buf.write_method_11(1, 1)
-            buf.write_method_6(gear_id, GEARTYPE_BITS)
+            buf.write_method_6(gear_id, GearType.GEARTYPE_BITSTOSEND)
         else:
             buf.write_method_11(0, 1)
 
