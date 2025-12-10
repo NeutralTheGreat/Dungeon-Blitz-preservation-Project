@@ -10,7 +10,6 @@ from constants import (
     class_64,
     NEWS_EVENTS,
     SLOT_BIT_WIDTHS,
-    NUM_TALENT_SLOTS,
     GEARTYPE_BITS,
     class_119, class_111, class_9, class_66, MASTERCLASS_TO_BUILDING, class_21, Game, Mission, Entity, class_7,
     class_16, class_118, class_1, class_10,
@@ -507,9 +506,9 @@ def Player_Data_Packet(char: dict,
 
     if selected > 0:
         buf.write_method_11(1, 1)
-        talent_tree = char.get("TalentTree", {}).get(str(selected), {"nodes": [None] * NUM_TALENT_SLOTS})
-        nodes = talent_tree.get("nodes", [None] * NUM_TALENT_SLOTS)
-        for i in range(NUM_TALENT_SLOTS):
+        talent_tree = char.get("TalentTree", {}).get(str(selected), {"nodes": [None] * class_118.NUM_TALENT_SLOTS})
+        nodes = talent_tree.get("nodes", [None] * class_118.NUM_TALENT_SLOTS)
+        for i in range(class_118.NUM_TALENT_SLOTS):
             node = nodes[i] or {"filled": False, "points": 0, "nodeID": i + 1}
             if node.get("filled", False):
                 buf.write_method_11(1, 1)

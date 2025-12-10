@@ -242,7 +242,7 @@ def Send_Entity_Data(entity: Dict[str, Any]) -> bytes:
         bb.write_method_6(1 if has_talents else 0, 1)
 
         if has_talents:
-            for slot in range(NUM_TALENT_SLOTS):  # always 27 slots
+            for slot in range(class_118.NUM_TALENT_SLOTS):  # always 27 slots
                 t = talents[slot] if slot < len(talents) and talents[slot] else None
                 if t and t.get("nodeID", 0) > 0 and t.get("points", 0) > 0:
                     node_id = t["nodeID"]
