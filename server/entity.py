@@ -151,13 +151,9 @@ def Send_Entity_Data(entity: Dict[str, Any]) -> bytes:
 
         timing_flag = entity.get("set_timing_flag", False)
         bb.write_method_6(1 if timing_flag else 0, 1)
-        if bb.debug:
-            bb.debug_log.append(f"timing_flag={timing_flag}")
 
         appearance_flag = entity.get("show_appearance_effect", False)  # True for new player  spawns if the player is already in the level then it is False
         bb.write_method_6(1 if appearance_flag else 0, 1)
-        if bb.debug:
-            bb.debug_log.append(f"appearance_flag={appearance_flag}")
 
         active_pet = entity.get("activePet", {})
         bb.write_method_6(active_pet.get("petID",      0), class_7.const_19)
@@ -313,6 +309,8 @@ def build_entity_dict(eid, char, props):
             "level": char.get("level", 1),
             "Talent_id": char.get("MasterClass", 0),
             "equippedMount": char.get("equippedMount", 0),
+            "set_timing_flag": True,
+            "show_appearance_effect": True
         })
 
     return ent_dict
