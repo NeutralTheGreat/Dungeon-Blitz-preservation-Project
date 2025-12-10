@@ -137,7 +137,7 @@ def handle_request_hatchery_eggs(session, data):
         save_characters(session.user_id, session.char_list)
 
     else:
-        print("new egg set is not ready yet")
+        pass
 
     char["EggNotifySent"] = False
     packet = build_hatchery_packet(owned, reset_time)
