@@ -19,7 +19,6 @@ from constants import (
     class_7_const_19,
     NEWS_EVENTS,
     GAME_CONST_209,
-    CLASS_118_CONST_127,
     SLOT_BIT_WIDTHS,
     NUM_TALENT_SLOTS,
     GEARTYPE_BITS,
@@ -525,7 +524,7 @@ def Player_Data_Packet(char: dict,
             if node.get("filled", False):
                 buf.write_method_11(1, 1)
                 node_id = node.get("nodeID", i + 1)
-                buf.write_method_6(node_id, CLASS_118_CONST_127)
+                buf.write_method_6(node_id, class_118.const_127)
                 bits = SLOT_BIT_WIDTHS[i]
                 buf.write_method_6(node["points"] - 1, bits)
             else:

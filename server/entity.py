@@ -248,7 +248,7 @@ def Send_Entity_Data(entity: Dict[str, Any]) -> bytes:
                     node_id = t["nodeID"]
                     points = t["points"]
                     bb.write_method_6(1, 1)  # slot filled
-                    bb.write_method_6(node_id, CLASS_118_CONST_127)  # 6 bits for nodeID
+                    bb.write_method_6(node_id, class_118.const_127)  # 6 bits for nodeID
                     bb.write_method_6(points - 1, method_277(slot))  # N bits for points
 
                 else:
