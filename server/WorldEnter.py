@@ -10,7 +10,6 @@ from constants import (
     class_10_const_665,
     CLASS_NAME_TO_ID,
     class_64,
-    class_1_const_254,
     class_64_const_499,
     class_111_const_432,
     class_64_const_218,
@@ -376,7 +375,7 @@ def Player_Data_Packet(char: dict,
         if has_session:
             # 2a) Primary gem ID
             primary = mf.get("primary", 0)
-            buf.write_method_6(primary, class_1_const_254)
+            buf.write_method_6(primary, class_1.const_254)
 
             # 2b) In‑progress or completed?
             status = mf.get("status", class_111.const_509)
