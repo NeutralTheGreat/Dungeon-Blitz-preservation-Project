@@ -10,7 +10,6 @@ from constants import (
     class_10_const_665,
     CLASS_NAME_TO_ID,
     class_64,
-    class_9_const_28,
     class_1_const_254,
     class_64_const_499,
     class_111_const_432,
@@ -368,7 +367,7 @@ def Player_Data_Packet(char: dict,
             seq = CLASS_BUILD_ORDER.get(cls, CLASS_BUILD_ORDER["paladin"])
             for bid in seq:
                 val = stats_dict.get(str(bid), 0)
-                buf.write_method_6(val, class_9_const_28)
+                buf.write_method_6(val, class_9.const_28)
 
         # 2) Session flag
         has_session = mf.get("hasSession", False)
@@ -617,9 +616,9 @@ def send_building_update(session, char):
 
     buf = BitBuffer()
     buf.write_method_6(first_building_id, class_9.const_129)
-    buf.write_method_6(first_building_level, class_9_const_28)
+    buf.write_method_6(first_building_level, class_9.const_28)
     buf.write_method_6(second_building_id, class_9.const_129)
-    buf.write_method_6(second_building_level, class_9_const_28)
+    buf.write_method_6(second_building_level, class_9.const_28)
     buf.write_method_6(scaffolding_id, class_9.const_129)
 
     pkt = struct.pack(">HH", 0xDA, len(buf.to_bytes())) + buf.to_bytes()
@@ -741,11 +740,11 @@ def build_enter_world_packet(
             bu = char.get("buildingUpgrade", {}) or {}
             scaffolding_level = int(bu.get("buildingID", 0) or 0)
 
-        buf.write_method_6(forge_level, class_9_const_28)
-        buf.write_method_6(keep_level, class_9_const_28)
-        buf.write_method_6(tower_level, class_9_const_28)
-        buf.write_method_6(tome_level, class_9_const_28)
-        buf.write_method_6(barn_level, class_9_const_28)
+        buf.write_method_6(forge_level, class_9.const_28)
+        buf.write_method_6(keep_level, class_9.const_28)
+        buf.write_method_6(tower_level, class_9.const_28)
+        buf.write_method_6(tome_level, class_9.const_28)
+        buf.write_method_6(barn_level, class_9.const_28)
         buf.write_method_6(scaffolding_level, class_9.const_129)
 
     payload = buf.to_bytes()
