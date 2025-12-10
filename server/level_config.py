@@ -7,7 +7,7 @@ from Character import load_characters, save_characters
 from WorldEnter import build_enter_world_packet
 from bitreader import BitReader
 from constants import door, class_119, Entity, _load_json
-from globals import used_tokens, pending_world, session_by_token, token_char, level_players, send_admin_chat
+from globals import used_tokens, pending_world, session_by_token, token_char, send_admin_chat, handle_entity_destroy_server, all_sessions
 
 
 # witness the spaghetti code  down below :)
@@ -265,8 +265,6 @@ def handle_open_door(session, data, conn):
 
     print(f"[{session.addr}] Sent DOOR_TARGET: doorID={door_id}, level='{target_level}'")
 
-    # --- Prepare for upcoming level transition ---
-    session.player_spawned = False
 
 def handle_level_transfer_request(session, data, conn):
     """
@@ -326,6 +324,9 @@ def handle_level_transfer_request(session, data, conn):
     if session.clientEntID in session.entities:
         del session.entities[session.clientEntID]
         print(f"[{session.addr}] Removed entity {session.clientEntID} from level {old_level}")
+        handle_entity_destroy_server(session, session.clientEntID, all_sessions)
+    # Prepare for upcoming level transition
+    session.player_spawned = False
 
     # Ensure we know user_id
     if not session.user_id:
