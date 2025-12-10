@@ -16,7 +16,6 @@ from constants import (
     class_64_const_499,
     class_111_const_432,
     class_64_const_218,
-    class_9_const_129,
     class_7_const_19,
     NEWS_EVENTS,
     GAME_CONST_209,
@@ -620,11 +619,11 @@ def send_building_update(session, char):
     scaffolding_id = int(char.get("buildingUpgrade", {}).get("buildingID", 0) or 0)
 
     buf = BitBuffer()
-    buf.write_method_6(first_building_id, class_9_const_129)
+    buf.write_method_6(first_building_id, class_9.const_129)
     buf.write_method_6(first_building_level, class_9_const_28)
-    buf.write_method_6(second_building_id, class_9_const_129)
+    buf.write_method_6(second_building_id, class_9.const_129)
     buf.write_method_6(second_building_level, class_9_const_28)
-    buf.write_method_6(scaffolding_id, class_9_const_129)
+    buf.write_method_6(scaffolding_id, class_9.const_129)
 
     pkt = struct.pack(">HH", 0xDA, len(buf.to_bytes())) + buf.to_bytes()
     session.conn.sendall(pkt)
@@ -750,7 +749,7 @@ def build_enter_world_packet(
         buf.write_method_6(tower_level, class_9_const_28)
         buf.write_method_6(tome_level, class_9_const_28)
         buf.write_method_6(barn_level, class_9_const_28)
-        buf.write_method_6(scaffolding_level, class_9_const_129)
+        buf.write_method_6(scaffolding_level, class_9.const_129)
 
     payload = buf.to_bytes()
     return struct.pack(">HH", 0x21, len(payload)) + payload
