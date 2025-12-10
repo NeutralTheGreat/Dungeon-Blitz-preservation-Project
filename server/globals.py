@@ -321,3 +321,38 @@ def send_new_pet_packet(session, type_id, special_id, rank):
     session.conn.sendall(pkt)
 
     print(f"[PET] Sent NEW PET : type={type_id}, special_id={special_id}, rank={rank}")
+
+def send_server_shutdown_warning(seconds):
+    bb = BitBuffer()
+    bb.write_method_4(seconds)
+    body = bb.to_bytes()
+
+    pkt = struct.pack(">HH", 0x101, len(body)) + body
+
+    for sess in all_sessions:
+        sess.conn.sendall(pkt)
+
+def send_admin_chat(msg, targets=None):
+    """
+    Sends an admin message to either:
+      - a list of players
+      - a single player
+      - everyone if (targets=None)
+    """
+    bb = BitBuffer()
+    bb.write_method_13(msg)
+    body = bb.to_bytes()
+
+    pkt = struct.pack(">HH", 0x102, len(body)) + body
+
+    # If no targets are specified, then broadcast to everybody
+    if targets is None:
+        targets = all_sessions
+
+    # If a single session is passed then wrap in list
+    if not isinstance(targets, (list, tuple, set)):
+        targets = [targets]
+
+    # Send to all selected sessions
+    for sess in targets:
+            sess.conn.sendall(pkt)
