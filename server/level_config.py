@@ -7,16 +7,27 @@ from Character import load_characters, save_characters
 from WorldEnter import build_enter_world_packet
 from bitreader import BitReader
 from constants import door, class_119, Entity, _load_json
-from globals import used_tokens, pending_world, session_by_token, token_char, level_players
+from globals import used_tokens, pending_world, session_by_token, token_char, level_players, send_admin_chat
+
 
 # witness the spaghetti code  down below :)
 
-def resolve_special_mission_doors(char: dict, current_level: str, target_level: str) -> str:
+def resolve_special_mission_doors(session, char, current_level, target_level):
     missions = char.get("missions", {})
 
     def get_state(mid):
         m = missions.get(str(mid))
         return m.get("state", 0) if m else 0
+
+    msg = "Cemetery Hill files are missing. You cannot enter this level."
+
+    if target_level == "CemeteryHill":
+        send_admin_chat(msg, targets=session)
+        return "BridgeTown"
+
+    if target_level == "CemeteryHillHard":
+        send_admin_chat(msg, targets=session)
+        return "BridgeTownHard"
 
     if target_level == "CraftTown":
         # Mission 5: "I claim this keep"
@@ -331,7 +342,7 @@ def handle_level_transfer_request(session, data, conn):
     session.authenticated = True
 
     # Resolve mission/special door overrides
-    target_level = resolve_special_mission_doors(char, old_level, target_level)
+    target_level = resolve_special_mission_doors(session, char, old_level, target_level)
 
     # Compute spawn coordinates for the NEW level (but don't spawn yet)
     new_x, new_y, new_has_coord = get_spawn_coordinates(char, old_level, target_level)
