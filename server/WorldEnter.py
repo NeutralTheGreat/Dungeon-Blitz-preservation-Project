@@ -9,7 +9,6 @@ from constants import (
     GearType,
     class_10_const_665,
     CLASS_NAME_TO_ID,
-    ENTITY_CONST_244,
     class_64,
     class_9_const_28,
     class_1_const_254,
@@ -326,7 +325,7 @@ def Player_Data_Packet(char: dict,
             if online:
                 buf.write_method_11(0, 1)  # hasCustomName = false
                 class_id = CLASS_NAME_TO_ID.get(class_name, 0)
-                buf.write_method_11(class_id, ENTITY_CONST_244)  # class
+                buf.write_method_11(class_id, Entity.const_244)  # class
                 buf.write_method_11(level, MAX_CHAR_LEVEL_BITS)  # level
 
 
