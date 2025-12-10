@@ -373,3 +373,10 @@ def handle_change_offset_y(session, data, all_sessions):
                 s.conn.sendall(pkt)
             except:
                 pass
+
+# TODO...
+def handle_char_regen(session, data):
+    br = BitReader(data[4:])
+    ent_id = br.read_method_9()
+    regen_amount = br.read_method_24()
+    print(f"entity id : {ent_id} : regen_amount : {regen_amount} ")

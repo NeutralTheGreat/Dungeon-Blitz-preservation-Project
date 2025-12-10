@@ -661,11 +661,6 @@ def handle_update_equipment(session, raw_data):
 def handle_hp_increase_notice(session, data):
        pass
 
-def handle_char_regen(session, data):
-    br = BitReader(data[4:])
-    ent_id = br.read_method_9()
-    regen_amount = br.read_method_24()
-    print(f"entity id : {ent_id} : regen_amount : {regen_amount} ")
 
 #handled
 #############################################
