@@ -24,6 +24,12 @@ def Player_Data_Packet(char: dict,
                        new_y: int = None,
                        new_has_coord: bool = True,
                        send_extended: bool = False) -> bytes:
+    
+    now = int(time.time())
+
+    def is_in_progress(ready_ts: int) -> bool:
+        return ready_ts > now
+
     buf = BitBuffer()
 
     # ──────────────(Preamble)──────────────
@@ -351,16 +357,16 @@ def Player_Data_Packet(char: dict,
                 val = stats_dict.get(str(bid), 0)
                 buf.write_method_6(val, class_9.const_28)
 
-        # 2) Session flag
+        # Session flag
         has_session = mf.get("hasSession", False)
         buf.write_method_11(1 if has_session else 0, 1)
 
         if has_session:
-            # 2a) Primary gem ID
+            #  Primary gem ID
             primary = mf.get("primary", 0)
             buf.write_method_6(primary, class_1.const_254)
 
-            # 2b) In‑progress or completed?
+            #  In‑progress or completed?
             status = mf.get("status", class_111.const_509)
             if status == class_111.const_286:  # in-progress
                 buf.write_method_11(1, 1)
@@ -373,7 +379,7 @@ def Player_Data_Packet(char: dict,
                     buf.write_method_6(mf.get("secondary", 0), class_64.const_218)
                     buf.write_method_6(mf.get("usedlist", 0), class_111.const_432)
 
-            # 2c) Always send these two when a session exists
+            # Always send these two when a session exists
             buf.write_method_91(min(mf.get("forge_roll_a", 0), 65535))
             buf.write_method_91(min(mf.get("forge_roll_b", 0), 65535))
         buf.write_method_11(1 if mf.get("is_extended_forge", False) else 0, 1)
@@ -384,7 +390,7 @@ def Player_Data_Packet(char: dict,
             buf.write_method_11(1, 1)
             buf.write_method_6(research["abilityID"], class_10.const_83)
             end_sec = research.get("ReadyTime", 0)
-            if research.get("done"):
+            if end_sec and end_sec <= now:
                 buf.write_method_4(0)
             else:
                 buf.write_method_4(end_sec)
@@ -392,22 +398,22 @@ def Player_Data_Packet(char: dict,
             buf.write_method_11(0, 1)
 
         # ──────────────(buildingResearch)──────────────
-        bu = char.get("buildingUpgrade")
-        if bu and not bu.get("done", False):
-            buf.write_method_11(1, 1)
+        bu = char.get("buildingUpgrade", {})
+        ready_ts = bu.get("ReadyTime", 0)
+        has_building_upgrade = (isinstance(bu, dict) and bu.get("buildingID", 0) != 0 and is_in_progress(ready_ts))
+        buf.write_method_11(1 if has_building_upgrade else 0, 1)
+        if has_building_upgrade:
             buf.write_method_6(bu["buildingID"], class_9.const_129)
-            buf.write_method_4(bu["ReadyTime"])
-        else:
-            buf.write_method_11(0, 1)
+            buf.write_method_4(ready_ts)
 
         # ──────────────(towerResearch)──────────────
         tr = char.get("talentResearch", {})
-        has_tr = isinstance(tr, dict) and not tr.get("done", False) and tr.get("ReadyTime", 0) > 0
+        ready_ts = tr.get("ReadyTime", 0)
+        has_tr = (isinstance(tr, dict) and ready_ts > 0 and is_in_progress(ready_ts))
         buf.write_method_11(1 if has_tr else 0, 1)
-
         if has_tr:
             buf.write_method_6(tr.get("classIndex", 0), class_66.const_571)
-            buf.write_method_4(tr.get("ReadyTime", 0))
+            buf.write_method_4(ready_ts)
 
         # ──────────────(EggHachery)──────────────
         egg_data = char.get("EggHachery", {})

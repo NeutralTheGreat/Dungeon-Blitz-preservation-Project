@@ -118,8 +118,7 @@ def handle_talent_claim(session, data):
 
     char["talentResearch"] = {
         "classIndex": None,
-        "ReadyTime": 0,
-        "done": False
+        "ReadyTime": 0
     }
 
     save_characters(session.user_id, session.char_list)
@@ -164,7 +163,6 @@ def handle_talent_speedup(session, data):
             pass
 
     tr["ReadyTime"] = 0
-    tr["done"] = True
     char["talentResearch"] = tr
 
     save_characters(session.user_id, session.char_list)
@@ -206,8 +204,7 @@ def handle_train_talent_point(session, data):
         char["mammothIdols"] -= idol_cost
         tr = {
             "classIndex": class_index,
-            "ReadyTime": now,
-            "done": False
+            "ReadyTime": now
         }
         char["talentResearch"] = tr
 
@@ -233,8 +230,7 @@ def handle_train_talent_point(session, data):
     ready_ts = now + duration
     tr = {
         "classIndex": class_index,
-        "ReadyTime": ready_ts,
-        "done": False
+        "ReadyTime": ready_ts
     }
     char["talentResearch"] = tr
 
@@ -268,8 +264,7 @@ def handle_clear_talent_research(session, data):
 
     char["talentResearch"] = {
         "classIndex": None,
-        "ReadyTime": 0,
-        "done": False
+        "ReadyTime": 0
     }
 
     save_characters(session.user_id, session.char_list)

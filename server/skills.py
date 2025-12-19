@@ -13,9 +13,6 @@ def handle_skill_trained_claim(session):
         return
 
     research = char.get("SkillResearch")
-    if not research or not research.get("done"):
-        print(f"[{session.addr}] [0xD1] No completed skill research to claim")
-        return
 
     ability_id = research.get("abilityID", 0)
     if not ability_id:
@@ -30,7 +27,7 @@ def handle_skill_trained_claim(session):
     else:
         learned.append({"abilityID": ability_id, "rank": 1})
 
-    char["SkillResearch"] = {"abilityID": 0, "ReadyTime": 0, "done": True}
+    char["SkillResearch"] = {"abilityID": 0, "ReadyTime": 0}
     save_characters(session.user_id, session.char_list)
 
 def handle_skill_research_cancel_request(session):
@@ -39,12 +36,7 @@ def handle_skill_research_cancel_request(session):
         print(f"[{session.addr}] [0xDD] No active character")
         return
 
-    research = char.get("SkillResearch")
-    if not research or research.get("done"):
-        print(f"[{session.addr}] [0xDD] No active skill research to cancel")
-        return
-
-    char["SkillResearch"] = {"abilityID": 0, "ReadyTime": 0, "done": True}
+    char["SkillResearch"] = {"abilityID": 0, "ReadyTime": 0}
     save_characters(session.user_id, session.char_list)
 
 def handle_skill_speed_up_request(session, data):
@@ -57,16 +49,13 @@ def handle_skill_speed_up_request(session, data):
         return
 
     research = char.get("SkillResearch")
-    if not research or research.get("done"):
-        print(f"[{session.addr}] [0xDE] No active skill research")
-        return
 
     if idol_cost:
         char["mammothIdols"] = max(0, char.get("mammothIdols", 0) - idol_cost)
         send_premium_purchase(session, "SkillSpeedup", idol_cost)
         print(f"[{session.addr}] [0xDE] Deducted {idol_cost} idols")
 
-    research.update({"ReadyTime": 0, "done": True})
+    research.update({"ReadyTime": 0})
     save_characters(session.user_id, session.char_list)
     send_skill_complete_packet(session, research["abilityID"])
 
@@ -99,7 +88,7 @@ def handle_start_skill_training(session, data, conn):
                        callback=lambda uid=session.user_id, cname=char["name"]:
                                  _on_research_done_for(uid, cname))
 
-    char["SkillResearch"] = {"abilityID": ability_id, "ReadyTime": ready_ts, "done": False}
+    char["SkillResearch"] = {"abilityID": ability_id, "ReadyTime": ready_ts}
     save_characters(session.user_id, session.char_list)
 
 def handle_equip_active_skills(session, raw_data):

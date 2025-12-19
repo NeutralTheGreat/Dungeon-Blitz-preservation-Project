@@ -65,8 +65,7 @@ def handle_building_upgrade(session, data):
     char["buildingUpgrade"] = {
         "buildingID": building_id,
         "rank": target_rank,
-        "ReadyTime": ready_time,
-        "done": False
+        "ReadyTime": ready_time
     }
 
     save_characters(session.user_id, session.char_list)
@@ -91,7 +90,7 @@ def handle_building_speed_up_request(session, data):
 
     stats = char.setdefault("magicForge", {}).setdefault("stats_by_building", {})
     stats[str(building_id)] = new_rank
-    char["buildingUpgrade"] = {"buildingID": 0, "rank": 0, "ReadyTime": 0, "done": False}
+    char["buildingUpgrade"] = {"buildingID": 0, "rank": 0, "ReadyTime": 0}
     save_characters(session.user_id, session.char_list)
 
     mem_char = next((c for c in session.char_list if c["name"] == session.current_character), None)
@@ -107,7 +106,7 @@ def handle_cancel_building_upgrade(session, data):
     upgrade = char.get("buildingUpgrade", {})
     building_id = upgrade.get("buildingID", 0)
 
-    char["buildingUpgrade"] = {"buildingID": 0, "rank": 0, "ReadyTime": 0, "done": False}
+    char["buildingUpgrade"] = {"buildingID": 0, "rank": 0, "ReadyTime": 0}
     save_characters(session.user_id, session.char_list)
 
     mem_char = next((c for c in session.char_list if c.get("name") == session.current_character), None)
@@ -121,7 +120,7 @@ def handle_building_claim(session, data):
     building_id = upgrade.get("buildingID", 0)
     rank = upgrade.get("rank", 0)
 
-    char["buildingUpgrade"] = {"buildingID": 0, "rank": 0, "ReadyTime": 0, "done": False}
+    char["buildingUpgrade"] = {"buildingID": 0, "rank": 0, "ReadyTime": 0}
     save_characters(session.user_id, session.char_list)
 
     mem_char = next((c for c in session.char_list if c.get("name") == session.current_character), None)

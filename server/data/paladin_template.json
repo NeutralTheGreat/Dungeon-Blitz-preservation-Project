@@ -8844,19 +8844,16 @@
     },
     "SkillResearch": {
         "abilityID": 0,
-        "ReadyTime": 0,
-        "done": true
+        "ReadyTime": 0
     },
     "buildingUpgrade": {
         "buildingID": 0,
         "rank": 0,
-        "ReadyTime": 0,
-        "done": true
+        "ReadyTime": 0
     },
     "talentResearch": {
         "classIndex": null,
-        "ReadyTime": 0,
-        "done": true
+        "ReadyTime": 0
     },
     "EggHachery": {
         "EggID": 0,
