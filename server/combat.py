@@ -77,6 +77,33 @@ def broadcast_gear_change(session, all_sessions):
         ):
             other.conn.sendall(pkt)
 
+def apply_and_broadcast_hp_delta(
+    *,
+    source_session,
+    ent_id: int,
+    delta: int,
+    all_sessions,
+    source_name: str,
+):
+    ent = source_session.entities.get(ent_id)
+    ent["hp"] = max(0, ent.get("hp", 0) + delta)
+
+    bb = BitBuffer()
+    bb.write_method_4(ent_id)
+    bb.write_signed_method_45(delta)
+
+    payload = bb.to_bytes()
+    pkt = struct.pack(">HH", 0x3A, len(payload)) + payload
+
+    for other in all_sessions:
+        if (
+            other is not source_session
+            and other.player_spawned
+            and other.current_level == source_session.current_level
+        ):
+            other.conn.sendall(pkt)
+
+
         # game client function handlers
        #####################################
 
@@ -433,12 +460,35 @@ def handle_change_offset_y(session, data, all_sessions):
             except:
                 pass
 
-# TODO...
-def handle_char_regen(session, data):
+
+# Sent when equipment, runes, or stats change and HP
+def handle_char_regen(session, data, all_sessions):
     br = BitReader(data[4:])
     ent_id = br.read_method_9()
-    regen_amount = br.read_method_24()
-    print(f"entity id : {ent_id} : regen_amount : {regen_amount} ")
+    delta  = br.read_method_24()
+
+    apply_and_broadcast_hp_delta(
+        source_session=session,
+        ent_id=ent_id,
+        delta=delta,
+        all_sessions=all_sessions,
+        source_name="GEAR/STAT",
+    )
+
+
+# Sent periodically by the client when passive regeneration occurs.
+def handle_char_regen_tick(session, data, all_sessions):
+    br = BitReader(data[4:])
+    ent_id = br.read_method_9()
+    delta  = br.read_method_24()
+
+    apply_and_broadcast_hp_delta(
+        source_session=session,
+        ent_id=ent_id,
+        delta=delta,
+        all_sessions=all_sessions,
+        source_name="REGEN",
+    )
 
 
 def handle_equip_rune(session,  data):
