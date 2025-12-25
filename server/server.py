@@ -10,19 +10,19 @@ from globals import all_sessions, HOST, PORTS, Client_Crash_Reports, handle_enti
 from scheduler import set_active_session_resolver
 from static_server import start_static_server
 from Character import save_characters, handle_request_armory_gears, handle_alert_state_update, PaperDoll_Request
+from dev import DEVFLAG_STANDALONE_CLIENT
+from entity import handle_entity_full_update
 
 from login import handle_login_version, handle_login_create, handle_login_authenticate, handle_login_character_create, handle_character_select, handle_gameserver_login
-from dev import DEVFLAG_STANDALONE_CLIENT
 from level_config import handle_open_door, handle_level_transfer_request, handle_request_door_state, LEVEL_CONFIG, handle_entity_incremental_update
 from Forge import handle_forge_speed_up_packet, handle_start_forge, handle_collect_forge_charm, handle_cancel_forge, handle_use_forge_xp_consumable, handle_allocate_magic_forge_artisan_skill_points, handle_magic_forge_reroll
 from talent import handle_respec_talent_tree, handle_allocate_talent_tree_points, handle_talent_claim, handle_talent_speedup, handle_train_talent_point, handle_clear_talent_research, handle_active_talent_change_request
 from skills import handle_skill_trained_claim, handle_skill_research_cancel_request, handle_skill_speed_up_request, handle_start_skill_training, handle_equip_active_skills
-from entity import handle_entity_full_update
-from combat import handle_entity_destroy, handle_buff_tick_dot, handle_respawn_broadcast, handle_request_respawn, handle_grant_reward, handle_power_hit, handle_projectile_explode, handle_add_buff, handle_remove_buff, handle_change_max_speed, handle_power_cast, handle_change_offset_y, handle_char_regen
+from combat import handle_entity_destroy, handle_buff_tick_dot, handle_respawn_broadcast, handle_request_respawn, handle_grant_reward, handle_power_hit, handle_projectile_explode, handle_add_buff, handle_remove_buff, handle_change_max_speed, handle_power_cast, handle_change_offset_y, handle_char_regen, handle_equip_rune
 from buildings import handle_building_claim, handle_building_upgrade, handle_building_speed_up_request, handle_cancel_building_upgrade
 from socials import handle_zone_panel_request, handle_public_chat, handle_private_message, handle_room_thought, handle_start_skit, handle_emote_begin, handle_group_invite, handle_query_message_answer, handle_map_location_update, handle_group_kick, handle_group_leave, handle_group_leader, handle_send_group_chat
 from pets import handle_equip_pets, handle_mount_equip_packet, handle_request_hatchery_eggs, handle_train_pet, handle_pet_training_collect, handle_pet_training_cancel, handle_pet_speed_up, handle_egg_hatch, handle_egg_speed_up, handle_collect_hatched_egg, handle_cancel_egg_hatch
-from Commands import (handle_gear_packet, handle_apply_dyes, handle_equip_rune, handle_change_look, handle_create_gearset, handle_name_gearset, \
+from Commands import (handle_gear_packet, handle_apply_dyes, handle_change_look, handle_create_gearset, handle_name_gearset, \
                       handle_apply_gearset, handle_update_equipment, handle_hp_increase_notice, handle_lockbox_reward, handle_linkupdater,
                       handle_talk_to_npc, handle_queue_potion, handle_badge_request)
 
@@ -331,6 +331,8 @@ def handle_client(session: ClientSession):
                 handle_change_offset_y(session, data, all_sessions)
             elif pkt == 0x100:
                  handle_char_regen(session, data)
+            elif pkt == 0xB0:
+                handle_equip_rune(session, data)
             ############################################
 
             # buildings.py
@@ -435,8 +437,6 @@ def handle_client(session: ClientSession):
                 handle_create_gearset(session, data)
             elif pkt == 0xC6:
                 handle_apply_gearset(session, data)
-            elif pkt == 0xB0:
-                handle_equip_rune(session, data)
             elif pkt == 0x31:
                 handle_gear_packet(session, data)
             elif pkt == 0x30:

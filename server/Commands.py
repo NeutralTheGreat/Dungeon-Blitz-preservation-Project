@@ -4,7 +4,7 @@ import time
 
 from Character import save_characters, SAVE_PATH_TEMPLATE
 from bitreader import BitReader
-from constants import GearType, EntType, class_64, class_1, DyeType, Entity, class_3
+from constants import GearType, EntType, DyeType, Entity, class_3
 from BitBuffer import BitBuffer
 from constants import get_dye_color
 from globals import build_start_skit_packet, send_premium_purchase
@@ -245,113 +245,6 @@ def handle_gear_packet(session, raw_data):
     save_characters(session.user_id, session.char_list)
     print(f"[Save] slot {slot} updated with gear {gear_id}, inventory count = {len(inv)}")
 
-def handle_equip_rune(session,  data):
-    br = BitReader(data[4:])
-
-    entity_id = br.read_method_4()
-    gear_id   = br.read_method_6(GearType.GEARTYPE_BITSTOSEND)
-    gear_tier = br.read_method_6(GearType.const_176)
-    rune_id   = br.read_method_6(class_64.const_101)
-    rune_slot = br.read_method_6(class_1.const_765)  # 1–3
-
-    # Validate rune slot
-    if rune_slot not in (1, 2, 3):
-        print(f"[Warning] Invalid rune slot: {rune_slot}")
-        return
-
-    rune_idx = rune_slot - 1
-
-    char = next(
-        (c for c in session.char_list if c.get("name") == session.current_character),
-        None
-    )
-
-    equipped = char.setdefault("equippedGears", [])
-    inventory = char.setdefault("inventoryGears", [])
-    charms = char.setdefault("charms", [])
-
-    # Normalize equipped gear slots
-    required_slots = EntType.MAX_SLOTS - 1
-    while len(equipped) < required_slots:
-        equipped.append({
-            "gearID": 0,
-            "tier": 0,
-            "runes": [0, 0, 0],
-            "colors": [0, 0],
-        })
-    if len(equipped) > required_slots:
-        equipped[:] = equipped[:required_slots]
-
-    # Locate target gear
-    gear = next(
-        (g for g in equipped if g["gearID"] == gear_id and g["tier"] == gear_tier),
-        None
-    )
-    if not gear:
-        print(f"[Warning] Gear {gear_id} (tier {gear_tier}) not equipped")
-        return
-
-    old_rune = gear["runes"][rune_idx]
-
-    # Helper: increment charm count
-    def add_charm(charm_id, amount=1):
-        for c in charms:
-            if c["charmID"] == charm_id:
-                c["count"] += amount
-                return
-        charms.append({"charmID": charm_id, "count": amount})
-
-    # Helper: decrement charm count
-    def consume_charm(charm_id):
-        for c in charms:
-            if c["charmID"] == charm_id:
-                c["count"] -= 1
-                if c["count"] <= 0:
-                    charms.remove(c)
-                return True
-        return False
-
-    # Rune removal (ID 96)
-    if rune_id == 96:
-        gear["runes"][rune_idx] = 0
-
-        if old_rune and old_rune != 96:
-            add_charm(old_rune)
-
-        if not consume_charm(96):
-            print("[Warning] Rune remover (96) missing from charms")
-
-    # Equip new rune
-    else:
-        gear["runes"][rune_idx] = rune_id
-
-        if not consume_charm(rune_id):
-            print(f"[Warning] Rune {rune_id} not present in charms")
-
-    # Sync inventory copy
-    inv_gear = next(
-        (i for i in inventory if i["gearID"] == gear_id and i["tier"] == gear_tier),
-        None
-    )
-    if inv_gear:
-        inv_gear["runes"][rune_idx] = gear["runes"][rune_idx]
-    else:
-        inventory.append(gear.copy())
-
-    session.player_data["characters"] = session.char_list
-    save_characters(session.user_id, session.char_list)
-
-    # Echo response
-    bb = BitBuffer()
-    bb.write_method_4(entity_id)
-    bb.write_method_6(gear_id, GearType.GEARTYPE_BITSTOSEND)
-    bb.write_method_6(gear_tier, GearType.const_176)
-    bb.write_method_6(rune_id, class_64.const_101)
-    bb.write_method_6(rune_slot, class_1.const_765)
-
-    payload = bb.to_bytes()
-    packet = struct.pack(">HH", 0xB0, len(payload)) + payload
-    session.conn.sendall(packet)
 
 def send_look_update_packet(session, entity_id, head, hair, mouth, face, gender, hair_color, skin_color):
     """
