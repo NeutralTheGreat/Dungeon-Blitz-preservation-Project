@@ -136,7 +136,6 @@ class ClientSession:
         allow_save = (current_level == "CraftTown") or not is_dungeon
 
         if not allow_save:
-            print(f"[{self.addr}] Skipping position save (in dungeon): {current_level}")
             return
 
         # ONLY update coords, never the level name here
