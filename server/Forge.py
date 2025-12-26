@@ -4,7 +4,6 @@ import random
 import time
 
 from Character import save_characters
-from Commands import SAVE_PATH_TEMPLATE
 from bitreader import BitReader
 from constants import class_111, class_8, class_3, class_1, Game, class_64, \
     CHARM_DB, CONSUMABLE_BOOSTS, class_86, MATERIALS_DATA
@@ -250,8 +249,10 @@ def handle_forge_speed_up_packet(session, data):
     br = BitReader(data[4:])
     idols_to_spend = br.read_method_9()
 
-    char = next((c for c in session.player_data.get("characters", [])
-                 if c.get("name") == session.current_character), None)
+    char = next(
+        (c for c in session.char_list if c.get("name") == session.current_character),
+        None
+    )
 
     mf = char.setdefault("magicForge", {})
 
@@ -285,9 +286,7 @@ def handle_forge_speed_up_packet(session, data):
     secondary = mf.get("secondary", 0)
     usedlist  = mf.get("usedlist", 0)
 
-    # Save
-    with open(SAVE_PATH_TEMPLATE.format(user_id=session.user_id), "w", encoding="utf-8") as f:
-        json.dump(session.player_data, f, indent=2)
+    save_characters(session.user_id, session.char_list)
 
     # Send forge result packet (0xCD)
     send_forge_reroll_packet(
@@ -302,7 +301,10 @@ def handle_forge_speed_up_packet(session, data):
     )
 
 def handle_collect_forge_charm(session, data):
-    char = next((c for c in session.player_data.get("characters", [])if c.get("name") == session.current_character), None)
+    char = next(
+        (c for c in session.char_list if c.get("name") == session.current_character),
+        None
+    )
 
     mf = char.get("magicForge", {})
     primary   = int(mf.get("primary", 0))
@@ -344,12 +346,13 @@ def handle_collect_forge_charm(session, data):
         "forge_roll_b": 0,
         "is_extended_forge": False,
     })
-    with open(SAVE_PATH_TEMPLATE.format(user_id=session.user_id), "w", encoding="utf-8") as f:
-        json.dump(session.player_data, f, indent=2)
+    save_characters(session.user_id, session.char_list)
 
 def handle_cancel_forge(session, data):
-    chars = session.player_data.get("characters", [])
-    char = next((c for c in chars if c["name"] == session.current_character), None)
+    char = next(
+        (c for c in session.char_list if c.get("name") == session.current_character),
+        None
+    )
 
     mf = char.setdefault("magicForge", {})
     mf["hasSession"] = False
@@ -362,9 +365,8 @@ def handle_cancel_forge(session, data):
     mf["forge_roll_a"]   = 0
     mf["forge_roll_b"]   = 0
     mf["is_extended_forge"]   = False
-    save_path = SAVE_PATH_TEMPLATE.format(user_id=session.user_id)
-    with open(save_path, "w", encoding="utf-8") as f:
-        json.dump(session.player_data, f, indent=2)
+    save_characters(session.user_id, session.char_list)
+
 
 def handle_use_forge_xp_consumable(session, data):
     payload = data[4:]
@@ -438,9 +440,7 @@ def handle_magic_forge_reroll(session, data):
     mf["secondary_tier"] = new_tier
     mf["usedlist"] = new_usedlist
 
-    save_path = SAVE_PATH_TEMPLATE.format(user_id=session.user_id)
-    with open(save_path, "w", encoding="utf-8") as f:
-        json.dump(session.player_data, f, indent=2)
+    save_characters(session.user_id, session.char_list)
 
     send_forge_reroll_packet(
         session=session,

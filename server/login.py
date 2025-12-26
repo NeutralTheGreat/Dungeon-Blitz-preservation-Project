@@ -6,7 +6,7 @@ import secrets
 import struct
 import time
 
-from Character import load_characters, build_login_character_list_bitpacked, load_class_template
+from Character import load_characters, build_login_character_list_bitpacked, load_class_template, save_characters
 from WorldEnter import build_enter_world_packet, Player_Data_Packet
 from accounts import get_or_create_user_id, load_accounts, build_popup_packet, _SAVES_DIR, is_character_name_taken
 from ai_logic import AI_ENABLED, ensure_ai_loop, run_ai_loop
@@ -69,16 +69,7 @@ def handle_login_authenticate(session, data, conn):
         return
 
     session.user_id = user_id
-    save_path = os.path.join(_SAVES_DIR, f"{user_id}.json")
-
-    if os.path.exists(save_path):
-        with open(save_path, "r", encoding="utf-8") as f:
-            session.player_data = json.load(f)
-    else:
-        print(f"[{session.addr}] [0x14] No save file for user {user_id}, creating blank save.")
-        session.player_data = {"email": email, "characters": []}
-
-    session.char_list = session.player_data.get("characters", [])
+    session.char_list = load_characters(session.user_id)
     session.authenticated = True
 
     pkt = build_login_character_list_bitpacked(session.user_id, session.char_list)
@@ -125,14 +116,7 @@ def handle_login_character_create(session, data, conn):
     })
 
     session.char_list.append(new_char)
-    session.player_data = {
-        "user_id": session.user_id,
-        "characters": session.char_list
-    }
-
-    save_path = os.path.join(_SAVES_DIR, f"{session.user_id}.json")
-    with open(save_path, "w", encoding="utf-8") as f:
-        json.dump(session.player_data, f, indent=2)
+    save_characters(session.user_id, session.char_list)
 
     current_level = new_char["CurrentLevel"]["name"]
     prev_level = new_char["PreviousLevel"]["name"]
@@ -223,16 +207,6 @@ def handle_character_select(session, data, conn):
 
         conn.sendall(pkt)
         GS.pending_world[tk] = (c, current_level, prev_level)
-
-        session.player_data = {
-            "user_id": session.user_id,
-            "characters": session.char_list
-        }
-
-        save_path = os.path.join(_SAVES_DIR, f"{session.user_id}.json")
-        with open(save_path, "w", encoding="utf-8") as f:
-            json.dump(session.player_data, f, indent=2)
-
         print(f"[{session.addr}] [0x16] Transfer begin: {name}, tk={tk}, level={current_level}")
 
 def handle_gameserver_login(session, data, conn):
@@ -278,15 +252,7 @@ def handle_gameserver_login(session, data, conn):
     else:
         session.char_list.append(char)
 
-    session.player_data = {
-        "user_id": session.user_id,
-        "characters": session.char_list
-    }
-
-    save_path = os.path.join(_SAVES_DIR, f"{session.user_id}.json")
-    with open(save_path, "w", encoding="utf-8") as f:
-        json.dump(session.player_data, f, indent=2)
-
+    save_characters(session.user_id, session.char_list)
     GS.pending_world.pop(token, None)
 
     # Spawn point

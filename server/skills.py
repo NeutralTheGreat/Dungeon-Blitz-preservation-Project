@@ -111,5 +111,4 @@ def handle_equip_active_skills(session, raw_data):
             active[idx] = skill_id
 
     char["activeAbilities"] = active
-    session.player_data["characters"] = session.char_list
     save_characters(session.user_id, session.char_list)

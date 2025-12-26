@@ -623,8 +623,6 @@ def handle_apply_dyes(session, data, all_sessions):
 
     # Persist
     save_characters(session.user_id, session.char_list)
-    session.player_data["characters"] = session.char_list
-
     print(f"[Save] Dyes saved. New balances: gold={char.get('gold',0)} idols={char.get('mammothIdols',0)}")
 
     # Sync to self + broadcast

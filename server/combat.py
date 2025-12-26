@@ -575,7 +575,6 @@ def handle_equip_rune(session,  data):
     else:
         inventory.append(gear.copy())
 
-    session.player_data["characters"] = session.char_list
     save_characters(session.user_id, session.char_list)
 
     bb = BitBuffer()
@@ -636,6 +635,5 @@ def handle_update_single_gear(session, data, all_sessions):
     # Apply to equipped slot
     eq[slot] = gear_data
 
-    session.player_data["characters"] = session.char_list
     save_characters(session.user_id, session.char_list)
     broadcast_gear_change(session, all_sessions)

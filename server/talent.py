@@ -92,7 +92,6 @@ def handle_allocate_talent_tree_points(session, data):
 
     talent_tree["nodes"] = slots
 
-    session.player_data["characters"] = session.char_list
     save_characters(session.user_id, session.char_list)
 
 def handle_talent_claim(session, data):
@@ -287,8 +286,6 @@ def send_active_talent_tree_data(session, entity_id):
     else:
         return
 
-    session.player_data["characters"] = session.char_list
-
     bb = BitBuffer()
     bb.write_method_4(entity_id)
 
@@ -321,7 +318,6 @@ def handle_active_talent_change_request(session, raw_data):
     else:
         return
 
-    session.player_data["characters"] = session.char_list
     save_characters(session.user_id, session.char_list)
 
     bb = BitBuffer()

@@ -94,7 +94,6 @@ def handle_mount_equip_packet(session, data, all_sessions):
                  if c.get("name") == session.current_character), None)
 
     char["equippedMount"] = mount_id
-    session.player_data["characters"] = session.char_list
     save_characters(session.user_id, session.char_list)
 
     for other in all_sessions:
