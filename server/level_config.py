@@ -316,10 +316,6 @@ def handle_level_transfer_request(session, data, conn):
     old_y = ent.get("pos_y")
     has_old_coord = (old_x is not None and old_y is not None)
 
-    if not has_old_coord:
-        print(f"[ERROR] Lost player coordinates before level transfer! "
-              f"ent={ent} old_x={old_x} old_y={old_y}")
-
     # Remove old player entity if present
     if session.clientEntID in session.entities:
         del session.entities[session.clientEntID]
@@ -335,7 +331,6 @@ def handle_level_transfer_request(session, data, conn):
             print(f"[{session.addr}] ERROR: Could not resolve user_id for token {old_token}")
             return
         session.user_id = token_info[0]
-        print(f"[{session.addr}] Restored user_id from token: {session.user_id}")
 
     # Reload latest characters, ensure we're pointing to the right one
     session.char_list = load_characters(session.user_id)
@@ -501,6 +496,9 @@ def handle_entity_incremental_update(session, data, all_sessions):
     entity_id = br.read_method_4()
     is_self = (entity_id == session.clientEntID)
 
+    if is_self and not session.player_spawned:
+        return
+
     delta_x = br.read_method_45()
     delta_y = br.read_method_45()
     delta_vx = br.read_method_45()
@@ -520,12 +518,14 @@ def handle_entity_incremental_update(session, data, all_sessions):
     velocity_y = br.read_method_24() if is_airborne else 0
 
     # --- calculate new position ---
-    ent = session.entities.get(entity_id, {})
+    ent = session.entities.get(entity_id)
+    if not ent:
+        return
+
     old_x = ent.get("pos_x")
     old_y = ent.get("pos_y")
-
     if old_x is None or old_y is None:
-        print("[ERROR] Entity missing position data in movement update!")
+        return
 
     new_x = old_x + delta_x
     new_y = old_y + delta_y
