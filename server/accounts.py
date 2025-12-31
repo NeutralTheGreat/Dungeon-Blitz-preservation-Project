@@ -1,8 +1,6 @@
 import os
 import json
 import struct
-import tempfile
-import uuid
 
 from threading import Lock
 from BitBuffer import BitBuffer
@@ -11,20 +9,11 @@ _ACCOUNTS_PATH = "Accounts.json"
 _SAVES_DIR     = "saves"
 _lock          = Lock()
 
-def _atomic_write(path: str, data) -> None:
-    """
-    Atomically write JSON-serializable `data` to `path`.
-    Writes to a temp file then renames it into place.
-    """
-    dirpath = os.path.dirname(path) or "."
-    os.makedirs(dirpath, exist_ok=True)
+def _write_json(path: str, data) -> None:
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
-    with tempfile.NamedTemporaryFile("w", dir=dirpath, delete=False, encoding="utf-8") as tf:
-        json.dump(data, tf, ensure_ascii=False, indent=2)
-        tf.flush()
-        os.fsync(tf.fileno())
-
-    os.replace(tf.name, path)
 
 def load_accounts() -> dict[str, int]:
     if not os.path.exists(_ACCOUNTS_PATH):
@@ -44,7 +33,7 @@ def save_accounts_index(index: dict[str, int]) -> None:
         for email, uid in index.items()
     ]
     with _lock:
-        _atomic_write(_ACCOUNTS_PATH, entries)
+        _write_json(_ACCOUNTS_PATH, entries)
 
 def get_or_create_user_id(email: str) -> int:
     email = email.strip().lower()
@@ -60,7 +49,7 @@ def get_or_create_user_id(email: str) -> int:
 
     os.makedirs(_SAVES_DIR, exist_ok=True)
     save_path = os.path.join(_SAVES_DIR, f"{user_id}.json")
-    _atomic_write(save_path, {"user_id": user_id, "characters": []})
+    _write_json(save_path, {"user_id": user_id, "characters": []})
     return user_id
 
 def is_character_name_taken(name: str) -> bool:
