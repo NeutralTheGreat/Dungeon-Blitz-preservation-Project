@@ -332,13 +332,7 @@ def handle_create_gearset(session, raw_data):
         print(f"[WARNING] Character not found for create_gearset")
         return
 
-    # persist
-    save_path = SAVE_PATH_TEMPLATE.format(user_id=session.user_id)
-    with open(save_path, "w", encoding="utf-8") as f:
-        json.dump(pd, f, indent=2)
-    print(f"[Save] Created gearset slot {slot_idx} in {save_path}")
-
-    # echo back so the client will show the "Enter name" popup
+    save_characters(session.user_id, session.char_list)
     session.conn.sendall(raw_data)
 
 def handle_name_gearset(session, raw_data):
@@ -382,13 +376,7 @@ def handle_name_gearset(session, raw_data):
         print(f"[WARNING] Character not found for name_gearset")
         return
 
-    # Persist
-    save_path = SAVE_PATH_TEMPLATE.format(user_id=session.user_id)
-    with open(save_path, "w", encoding="utf-8") as f:
-        json.dump(pd, f, indent=2)
-    print(f"[Save] Renamed gearset slot {slot_idx} to “{name}” in {save_path}")
-
-    # Echo back to client
+    save_characters(session.user_id, session.char_list)
     session.conn.sendall(raw_data)
 
 def handle_apply_gearset(session, raw_data):
@@ -424,13 +412,7 @@ def handle_apply_gearset(session, raw_data):
         print(f"[WARNING] Character not found for apply_gearset")
         return
 
-    # Persist
-    save_path = SAVE_PATH_TEMPLATE.format(user_id=session.user_id)
-    with open(save_path, "w", encoding="utf-8") as f:
-        json.dump(pd, f, indent=2)
-    print(f"[Save] Assigned equipped gears to gearset slot {slot_idx} in {save_path}")
-
-    # Echo back to client
+    save_characters(session.user_id, session.char_list)
     session.conn.sendall(raw_data)
 
 def handle_update_equipment(session, raw_data):
@@ -485,13 +467,7 @@ def handle_update_equipment(session, raw_data):
         print(f"[WARNING] Character not found for update_equipment")
         return
 
-    # Persist
-    save_path = SAVE_PATH_TEMPLATE.format(user_id=session.user_id)
-    with open(save_path, "w", encoding="utf-8") as f:
-        json.dump(pd, f, indent=2)
-    print(f"[Save] Updated equippedGears for {session.current_character} in {save_path}")
-
-    # Echo back to client
+    save_characters(session.user_id, session.char_list)
     session.conn.sendall(raw_data)
 
 
