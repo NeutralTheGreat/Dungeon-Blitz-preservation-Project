@@ -1,468 +1,337 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>Debug Panel</title>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<meta charset="UTF-8">
+<title>Dungeon Blitz – Debug Panel</title>
+
 <style>
-body {
-    font-family: Arial;
-    background: url("http://127.0.0.1/background.webp") no-repeat center center;
-    background-size: cover;    /* fill screen */
-    margin: 0;
-    padding-top: 100px;         /* add space from top for URL bar */
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
-    min-height: 100vh;
-}
-
-
-
-.container {
-    background: #181a1b; /* black */
-    padding: 20px;
-    margin-top: -40px;
-    border-radius: 8px;
-    box-shadow: 0 0 15px rgba(0,0,0,0.2);
-    /*height: 200px; /* set your desired height */
-    width: 1160px;
-    backdrop-filter: blur(5px); /* optional: soft blur behind container */
-    color: #ffffff; /* white */
+    :root {
+        --bg-panel: rgba(15, 15, 15, 0.92);
+        --border: #2f2f2f;
+        --text: #e6e6e6;
+        --muted: #9a9a9a;
+        --accent: #3fa9f5;
     }
 
-input[type="text"], input[type="number"], select {
-    width: 100%;
+    body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        color: var(--text);
+
+
+        background:
+            linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)),
+            url("http://127.0.0.1/background.webp");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }
+
+    /* ───────── Main panel ───────── */
+    #panel {
+    width: 550px;
+    min-height: auto;
+    margin: 40px auto;
+    padding: 16px 18px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
     box-sizing: border-box;
-    padding: 4px;
-    margin-bottom: 8px;
 }
 
-/* Make labels and inputs inline with colon spacing */
-label {
-    display: inline-block;
-    min-width: 150px;      /* adjust as needed */
-    text-align: right;
-    margin-right: 5px;
-}
 
-input[type="text"],
-input[type="number"],
-select {
-    width: auto;          /* allow natural size instead of full width */
-    display: inline-block;
-}
+    h1 {
+        font-size: 18px;
+        margin: 0 0 12px 0;
+    }
+
+    h2 {
+        font-size: 13px;
+        margin: 12px 0 6px 0;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .section {
+        margin-bottom: 10px;
+    }
 
     .row {
-    display: flex;
-    align-items: center;      /* vertically center items */
-    gap: 5px;                 /* horizontal spacing between items */
-    margin-bottom: 5px;       /* spacing between rows */
-}
+        display: flex;
+        gap: 6px;
+        margin-bottom: 6px;
+    }
 
-.row select {
-    min-width: 150px;  /* enough to show full method name */
-    max-width: 250px;  /* optional, prevents giant select if many columns */
-    flex: none;        /* don't stretch with flex */
-}
+    input, select, button {
+        background: #1c1c1c;
+        color: var(--text);
+        border: 1px solid var(--border);
+        padding: 5px 6px;
+        font-size: 12px;
+        box-sizing: border-box;
+    }
 
+    input::placeholder {
+        color: var(--muted);
+    }
 
-.row input[placeholder="hint"] {
-    width: 200px;
-}
-    .row label {
-    min-width: auto;      /* remove fixed width */
-    text-align: left;     /* optional, just align normally */
-    white-space: nowrap;  /* keep it on one line */
-}
+    input, select {
+        flex: 1;
+    }
 
+    button {
+        cursor: pointer;
+        white-space: nowrap;
+    }
 
+    button:hover {
+        background: #2a2a2a;
+    }
 
+    button.danger {
+        border-color: #803030;
+        color: #ffb3b3;
+    }
+
+    button.danger:hover {
+        background: #402020;
+    }
+
+    .tiny {
+        font-size: 11px;
+        color: var(--muted);
+    }
+
+    /* Buffer rows */
+    .buffer-row {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 4px;
+    }
+
+    .buffer-row input {
+        flex: 1;
+    }
+
+    .buffer-row button {
+        padding: 4px 6px;
+    }
 </style>
-
-
 </head>
+
 <body>
-  <div class="container">
-    <h1>Debug Panel</h1>
 
-    <label>Saved Packets:</label>
-<select id="saved_pkt" onchange="loadSelectedPacket()">
-    {% for pkt in saved_packets %}
-    <option value="{{ pkt }}">{{ pkt }}</option>
+<div id="panel">
+
+    <h1>🧪 Debug Panel</h1>
+
+    <!-- Saved packets -->
+    <div class="section">
+        <h2>Saved</h2>
+        <div class="row">
+            <select id="savedPackets" onchange="loadSelectedPacket()">
+
+    {% for name in saved_packets %}
+        <option value="{{ name }}">{{ name }}</option>
     {% endfor %}
-</select>
-<button onclick="deleteSelectedPacket()">Delete Selected Packet</button>
-<br><br>
+    </select>
 
-    <label>Loop Packet:</label> <input type="checkbox" id="loop">
-    <label>Delay (s):</label> <input type="number" value="1" id="delay" step="0.1">
-    <br>
+            <button onclick="loadPacket()">Load</button>
+            <button class="danger" onclick="deletePacket()">✖</button>
+        </div>
+    </div>
 
-    <label>Packet Type (hex):</label> <input type="text" id="pkt_type" value="F5" size="6">
-    <br>
+    <!-- Target / header -->
+    <div class="section">
+        <h2>Target</h2>
+        <input id="targetPlayer" placeholder="Player name (blank = all)">
+    </div>
 
+    <div class="section">
+        <h2>Packet</h2>
+        <input id="packetType" placeholder="Packet type (hex, e.g. F5)">
+    </div>
 
-    <div class="form-grid">
-  <label for="target_player_packet">Target Player:</label>
-  <input type="text" id="target_player_packet" placeholder="Leave empty for all sessions">
+    <!-- Buffer builder -->
+    <div class="section">
+        <h2>BitBuffer</h2>
+        <div id="bufferRows"></div>
+
+        <div class="row">
+            <button onclick="addRow()">➕ Add Row</button>
+        </div>
+
+        <div class="tiny">
+            write_method_xxx • comma-separated values
+        </div>
+    </div>
+
+    <!-- Send options -->
+    <div class="section">
+        <h2>Send</h2>
+
+        <div class="row">
+            <input id="delay" type="number" step="0.1" value="1">
+            <label class="tiny" style="align-self:center;">delay (s)</label>
+        </div>
+
+        <div class="row">
+            <label class="tiny">
+                <input id="loop" type="checkbox"> loop
+            </label>
+        </div>
+
+        <div class="row">
+            <button onclick="sendPacket()">🚀 Send</button>
+            <button class="danger" onclick="stopLoop()">⛔ Stop</button>
+        </div>
+    </div>
+
+    <!-- Save -->
+    <div class="section">
+        <h2>Save</h2>
+
+        <input id="saveName" placeholder="Save name">
+        <input id="saveDesc" placeholder="Description">
+
+        <div class="row">
+            <button onclick="savePacket()">💾 Save Packet</button>
+        </div>
+    </div>
+
 </div>
 
+<script>
+    function addRow(method = "", value = "", hint = "") {
+    const row = document.createElement("div");
+    row.className = "buffer-row";
 
+    row.innerHTML = `
+        <input placeholder="write_method_xxx" value="${method}">
+        <input placeholder="values" value="${value}">
+        <input placeholder="hint (optional)" value="${hint}" title="${hint}">
+        <button onclick="this.parentElement.remove()">✖</button>
+    `;
 
-    <label>Description:</label> <input type="text" id="desc" size="60">
-    <br><br>
-
-    <div id="rows"></div>
-<button onclick="addRow()">Add Buffer Row</button>
-<button onclick="sendPacket()">Send Packet</button>
-<button onclick="stopPacketLoop()" id="stop_packet_btn" style="display:none">Stop Packet Loop</button>
-<br><br>
-
-    <button onclick="savePacket()">Save Packet</button>
-    <button onclick="loadPacketPrompt()">Load Packet by Name</button>
-    <br>
-    <p id="status"></p>
-
-    <div id="npc_section">
-        <h2>NPC Spawn Panel</h2>
-        <p>Hint: If ID, X, or Y are left as 0, the server will pick proper values.</p>
-        <label>Target Player:</label> <input type="text" id="target_player">
-        <br>
-        <label>ID:</label> <input type="text" id="npc_id" value="0">
-        <br>
-        <label>Name:</label> <input type="text" id="npc_name" value="FirePriestBossHard" list="npc_suggestions">
-        <datalist id="npc_suggestions">
-            {% for npc in npc_list %}
-            <option value="{{ npc }}"></option>
-            {% endfor %}
-        </datalist>
-        <br>
-        <label>X:</label> <input type="text" id="npc_x" value="0">
-        <br>
-        <label>Y:</label> <input type="text" id="npc_y" value="0">
-        <br>
-        <label>V:</label> <input type="text" id="npc_v" value="0">
-        <br>
-        <label>Team:</label> <input type="text" id="npc_team" value="2">
-        <br>
-        <label>Untargetable:</label> <input type="checkbox" id="npc_untargetable">
-        <br>
-        <label>Render Depth Offset:</label> <input type="text" id="npc_render_depth_offset" value="0">
-        <br>
-        <label>Behavior Speed:</label> <input type="text" id="npc_behavior_speed" value="0">
-        <br>
-        <label>Linked Mission:</label> <input type="text" id="npc_Linked_Mission" value="">
-        <br>
-        <label>Drama Anim:</label> <input type="text" id="npc_DramaAnim" value="">
-        <br>
-        <label>Sleep Anim:</label> <input type="text" id="npc_SleepAnim" value="">
-        <br>
-        <label>Summoner ID:</label> <input type="text" id="npc_summonerId" value="0">
-        <br>
-        <label>Power ID:</label> <input type="text" id="npc_power_id" value="0">
-        <br>
-        <label>Ent State:</label> <input type="text" id="npc_entState" value="0">
-        <br>
-        <label>Facing Left:</label> <input type="checkbox" id="npc_facing_left">
-        <br>
-        <label>Health Delta:</label> <input type="text" id="npc_health_delta" value="0">
-        <br>
-        <label>Loop Spawn:</label> <input type="checkbox" id="npc_loop">
-        <label>Delay (s):</label> <input type="number" id="npc_delay" value="2">
-        <br>
-        <label>Cycle NPCs:</label> <input type="checkbox" id="npc_cycle">
-        <label>Start Index:</label> <input type="text" id="npc_start_index" value="">
-        <br><br>
-<button onclick="spawnNpc()">Spawn NPC</button>
-<button onclick="stopNpcLoop()" id="stop_npc_btn" style="display:none">Stop NPC Loop</button>
-<button onclick="saveNpcToJson()">Save NPC to JSON</button>
-        <label>JSON Path:</label> <input type="text" id="json_path" size="40" placeholder="e.g., world_npcs/my_npcs.json">
-        <input type="file" id="json_file_picker" style="display:none" accept=".json">
-        <button onclick="$('#json_file_picker').click()">Pick File</button>
-        <p id="npc_status"></p>
-
-
-    </div> <!-- CLOSE npc_section -->
-</div> <!-- CLOSE container -->
-
-
-    <script>
-        const method_suggestions = {{ method_suggestions | tojson }};
-
-        function addRow(method='', value='', hint='') {
-            const div = document.createElement('div');
-            div.className = 'row';
-            div.innerHTML = `
-                <select>
-                    ${method_suggestions.map(m => `<option ${m === method ? 'selected' : ''}>${m}</option>`).join('')}
-                </select>
-                <input type="text" value="${value}" placeholder="value">
-                <button onclick="this.parentElement.remove()">Remove</button>
-                <label>hint:</label> <input type="text" value="${hint}" placeholder="hint">
-            `;
-            document.getElementById('rows').appendChild(div);
-        }
-        addRow();  // Initial row
-
-        function getBuffers() {
-            return Array.from(document.querySelectorAll('.row')).map(row => ({
-                method: row.querySelector('select').value,
-                value: row.querySelector('input[placeholder="value"]').value,
-                hint: row.querySelector('input[placeholder="hint"]').value
-            }));
-        }
-
-        function sendPacket() {
-    const data = {
-        packet_type: $('#pkt_type').val(),
-        description: $('#desc').val(),
-        buffers: getBuffers(),
-        loop: $('#loop').prop('checked'),
-        delay: $('#delay').val(),
-        target_player: $('#target_player_packet').val()
-    };
-    $.ajax({
-        url: '/send_packet',
-        type: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify(data),
-        dataType: 'json',
-        success: function(resp) {
-            $('#status').text(resp.message || resp.error);
-            if (resp.message && resp.message.includes('Looping packet started')) {
-                $('#stop_packet_btn').show();
-            }
-        },
-        error: function(xhr) {
-            $('#status').text('Error: ' + (xhr.responseJSON?.error || 'Request failed'));
-        }
-    });
-}
-
-        function savePacket() {
-            const name = prompt('Enter packet name:');
-            if (!name) return;
-            const data = {
-                name,
-                packet_type: $('#pkt_type').val(),
-                description: $('#desc').val(),
-                buffers: getBuffers()
-            };
-            $.ajax({
-                url: '/save_packet',
-                type: 'POST',
-                contentType: 'application/json',  // Set Content-Type
-                data: JSON.stringify(data),
-                dataType: 'json',
-                success: function(resp) {
-                    if (resp.success) {
-                        const select = $('#saved_pkt');
-                        select.empty();
-                        resp.saved_packets.forEach(p => select.append(`<option value="${p}">${p}</option>`));
-                        select.val(name);
-                        $('#status').text(`Packet '${name}' saved.`);
-                    } else {
-                        $('#status').text(resp.error);
-                    }
-                },
-                error: function(xhr) {
-                    $('#status').text('Error: ' + (xhr.responseJSON?.error || 'Request failed'));
-                }
-            });
-        }
-
-        function loadPacket(name) {
-            $.ajax({
-                url: '/load_packet',
-                type: 'POST',
-                contentType: 'application/json',  // Set Content-Type
-                data: JSON.stringify({name}),
-                dataType: 'json',
-                success: function(resp) {
-                    if (resp.error) {
-                        $('#status').text(resp.error);
-                        return;
-                    }
-                    $('#pkt_type').val(resp.packet_type || 'F5');
-                    $('#desc').val(resp.description || '');
-                    $('#rows').empty();
-                    resp.buffers.forEach(b => addRow(b.method, b.value, b.hint));
-                    $('#status').text(`Packet '${name}' loaded`);
-                },
-                error: function(xhr) {
-                    $('#status').text('Error: ' + (xhr.responseJSON?.error || 'Request failed'));
-                }
-            });
-        }
-
-        function loadPacketPrompt() {
-            const name = prompt('Enter packet name to load:');
-            if (name) loadPacket(name);
-        }
-
-        function loadSelectedPacket() {
-            const name = $('#saved_pkt').val();
-            if (name) loadPacket(name);
-        }
-
-        function spawnNpc() {
-    const data = {
-        target_player: $('#target_player').val(),
-        id: $('#npc_id').val(),
-        name: $('#npc_name').val(),
-        x: $('#npc_x').val(),
-        y: $('#npc_y').val(),
-        v: $('#npc_v').val(),
-        team: $('#npc_team').val(),
-        untargetable: $('#npc_untargetable').prop('checked'),
-        render_depth_offset: $('#npc_render_depth_offset').val(),
-        behavior_speed: $('#npc_behavior_speed').val(),
-        Linked_Mission: $('#npc_Linked_Mission').val(),
-        DramaAnim: $('#npc_DramaAnim').val(),
-        SleepAnim: $('#npc_SleepAnim').val(),
-        summonerId: $('#npc_summonerId').val(),
-        power_id: $('#npc_power_id').val(),
-        entState: $('#npc_entState').val(),
-        facing_left: $('#npc_facing_left').prop('checked'),
-        health_delta: $('#npc_health_delta').val(),
-        loop: $('#npc_loop').prop('checked'),
-        delay: $('#npc_delay').val(),
-        cycle: $('#npc_cycle').prop('checked'),
-        start_index: $('#npc_start_index').val()
-    };
-    $.ajax({
-        url: '/spawn_npc',
-        type: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify(data),
-        dataType: 'json',
-        success: function(resp) {
-            $('#npc_status').text(resp.message || resp.error);
-            if (resp.message && resp.message.includes('Looping NPC spawn started')) {
-                $('#stop_npc_btn').show();
-            }
-        },
-        error: function(xhr) {
-            $('#npc_status').text('Error: ' + (xhr.responseJSON?.error || 'Request failed'));
-        }
-    });
-}
-
-        function saveNpcToJson() {
-            const data = {
-                json_path: $('#json_path').val(),
-                target_player: $('#target_player').val(),
-                id: $('#npc_id').val(),
-                name: $('#npc_name').val(),
-                x: $('#npc_x').val(),
-                y: $('#npc_y').val(),
-                v: $('#npc_v').val(),
-                team: $('#npc_team').val(),
-                untargetable: $('#npc_untargetable').prop('checked'),
-                render_depth_offset: $('#npc_render_depth_offset').val(),
-                behavior_speed: $('#npc_behavior_speed').val(),
-                Linked_Mission: $('#npc_Linked_Mission').val(),
-                DramaAnim: $('#npc_DramaAnim').val(),
-                SleepAnim: $('#npc_SleepAnim').val(),
-                summonerId: $('#npc_summonerId').val(),
-                power_id: $('#npc_power_id').val(),
-                entState: $('#npc_entState').val(),
-                facing_left: $('#npc_facing_left').prop('checked'),
-                health_delta: $('#npc_health_delta').val()
-            };
-            $.ajax({
-                url: '/save_npc_to_json',
-                type: 'POST',
-                contentType: 'application/json',  // Set Content-Type
-                data: JSON.stringify(data),
-                dataType: 'json',
-                success: function(resp) {
-                    $('#npc_status').text(resp.message || resp.error);
-                },
-                error: function(xhr) {
-                    $('#npc_status').text('Error: ' + (xhr.responseJSON?.error || 'Request failed'));
-                }
-            });
-        }
-        $('#json_file_picker').on('change', function() {
-        const filePath = this.value.split(/[\\\/]/).pop(); // Get filename only
-        $('#json_path').val('world_npcs/' + filePath); // Prepend server-side folder
-        });
-
- function stopPacketLoop() {
-    $.ajax({
-        url: '/stop_packet_loop',
-        type: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({}),
-        dataType: 'json',
-        success: function(resp) {
-            $('#status').text(resp.message || resp.error);
-            $('#stop_packet_btn').hide();
-        },
-        error: function(xhr) {
-            $('#status').text('Error: ' + (xhr.responseJSON?.error || 'Request failed'));
-        }
-    });
-}
-
-function stopNpcLoop() {
-    $.ajax({
-        url: '/stop_npc_loop',
-        type: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({}),
-        dataType: 'json',
-        success: function(resp) {
-            $('#npc_status').text(resp.message || resp.error);
-            $('#stop_npc_btn').hide();
-        },
-        error: function(xhr) {
-            $('#npc_status').text('Error: ' + (xhr.responseJSON?.error || 'Request failed'));
-        }
-    });
-}
-
-        function deleteSelectedPacket() {
-    const name = $('#saved_pkt').val();
-    if (!name) {
-        $('#status').text('Error: No packet selected');
-        return;
+    document.getElementById("bufferRows").appendChild(row);
     }
-    if (!confirm(`Are you sure you want to delete packet '${name}'?`)) return;
-    $.ajax({
-        url: '/delete_packet',
-        type: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({ name }),
-        dataType: 'json',
-        success: function(resp) {
-            if (resp.success) {
-                const select = $('#saved_pkt');
-                select.empty();
-                resp.saved_packets.forEach(p => select.append(`<option value="${p}">${p}</option>`));
-                $('#status').text(`Packet '${name}' deleted.`);
-                $('#pkt_type').val('F5');
-                $('#desc').val('');
-                $('#rows').empty();
-                addRow();
-            } else {
-                $('#status').text(resp.error);
-            }
-        },
-        error: function(xhr) {
-            $('#status').text('Error: ' + (xhr.responseJSON?.error || 'Request failed'));
-        }
-    });
-}
 
-            document.getElementById('npc_section').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault(); // Prevent form submission or line breaks
-            spawnNpc();         // Call your existing spawn function
-        }
-    });
 
-    </script>
+    function collectBuffers() {
+    return [...document.querySelectorAll(".buffer-row")].map(r => {
+        const inputs = r.querySelectorAll("input");
+        return {
+            method: inputs[0].value,
+            value: inputs[1].value,
+            hint: inputs[2].value || undefined
+        };
+    }).filter(b => b.method && b.value);
+    }
+
+
+    function sendPacket() {
+        fetch("/send_packet", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                packet_type: document.getElementById("packetType").value,
+                target_player: document.getElementById("targetPlayer").value,
+                delay: document.getElementById("delay").value,
+                loop: document.getElementById("loop").checked,
+                buffers: collectBuffers()
+            })
+        })
+        .then(r => r.json())
+        .then(j => alert(j.message || "Sent"));
+    }
+
+    function stopLoop() {
+        fetch("/stop_packet_loop", { method: "POST" });
+    }
+
+    function savePacket() {
+        fetch("/save_packet", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                name: document.getElementById("saveName").value,
+                description: document.getElementById("saveDesc").value,
+                packet_type: document.getElementById("packetType").value,
+                buffers: collectBuffers()
+            })
+        })
+        .then(r => r.json())
+        .then(j => updateSavedList(j.saved_packets));
+    }
+
+    function loadPacket() {
+        const name = document.getElementById("savedPackets").value;
+        fetch("/load_packet", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ name })
+        })
+        .then(r => r.json())
+        .then(pkt => {
+            document.getElementById("packetType").value = pkt.packet_type;
+            document.getElementById("bufferRows").innerHTML = "";
+            pkt.buffers.forEach(b =>
+    addRow(b.method, b.value, b.hint || "")
+    );
+
+        });
+    }
+
+    function deletePacket() {
+        const name = document.getElementById("savedPackets").value;
+        fetch("/delete_packet", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ name })
+        })
+        .then(r => r.json())
+        .then(j => updateSavedList(j.saved_packets));
+    }
+
+    function updateSavedList(list) {
+        const sel = document.getElementById("savedPackets");
+        sel.innerHTML = "";
+        list.forEach(n => {
+            const o = document.createElement("option");
+            o.value = n;
+            o.textContent = n;
+            sel.appendChild(o);
+        });
+    }
+
+    function loadSelectedPacket() {
+    const name = document.getElementById("savedPackets").value;
+    if (!name) return;
+
+    fetch("/load_packet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name })
+    })
+    .then(r => {
+        if (!r.ok) throw new Error("Packet not found");
+        return r.json();
+    })
+    .then(pkt => {
+        document.getElementById("packetType").value = pkt.packet_type;
+        document.getElementById("bufferRows").innerHTML = "";
+        pkt.buffers.forEach(b =>
+    addRow(b.method, b.value, b.hint || "")
+   );
+
+    })
+    .catch(() => {
+        console.warn("Failed to auto-load packet:", name);
+    });
+    }
+
+    addRow();
+</script>
+
 </body>
 </html>
