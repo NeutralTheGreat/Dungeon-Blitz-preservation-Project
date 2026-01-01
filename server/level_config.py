@@ -233,7 +233,7 @@ def update_saved_levels_on_transfer(char: dict, old_level: str, new_level: str,n
         "y": int(round(new_y)),
     }
 
-def handle_open_door(session, data, conn):
+def handle_open_door(session, data):
     br = BitReader(data[4:])
     door_id = br.read_method_9()
 
@@ -261,12 +261,12 @@ def handle_open_door(session, data, conn):
 
     payload = bb.to_bytes()
     resp = struct.pack(">HH", 0x2E, len(payload)) + payload
-    conn.sendall(resp)
+    session.conn.sendall(resp)
 
     #print(f"[{session.addr}] Sent DOOR_TARGET: doorID={door_id}, level='{target_level}'")
 
 
-def handle_level_transfer_request(session, data, conn):
+def handle_level_transfer_request(session, data):
     """
     Handle 0x1D: client says "I am ready to transfer".
     We resolve the target level, save CurrentLevel/PreviousLevel for
@@ -400,10 +400,10 @@ def handle_level_transfer_request(session, data, conn):
         char=char,
     )
 
-    conn.sendall(pkt_out)
+    session.conn.sendall(pkt_out)
     #print(f"[{session.addr}] Sent ENTER_WORLD with token {new_token} "f"for {target_level} → pos=({new_x},{new_y})")
 
-def send_door_state(conn, door_id, door_state, door_target, star_rating=None):
+def send_door_state(session, door_id, door_state, door_target, star_rating=None):
     bb = BitBuffer()
     bb.write_method_4(door_id)
     bb.write_method_91(door_state)
@@ -415,9 +415,9 @@ def send_door_state(conn, door_id, door_state, door_target, star_rating=None):
 
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x42, len(payload)) + payload
-    conn.sendall(pkt)
+    session.conn.sendall(pkt)
 
-def handle_request_door_state(session, data, conn):
+def handle_request_door_state(session, data):
     br = BitReader(data[4:])
     door_id = br.read_method_9()
 
@@ -426,7 +426,7 @@ def handle_request_door_state(session, data, conn):
 
     #Unknown door
     if not entry:
-        send_door_state(conn, door_id, door.DOORSTATE_STATIC, "")
+        send_door_state(session, door_id, door.DOORSTATE_STATIC, "")
         return
 
     # Default values
@@ -484,7 +484,7 @@ def handle_request_door_state(session, data, conn):
             door_state = door.DOORSTATE_STATIC
             door_target = target_level
 
-    send_door_state(conn, door_id, door_state, door_target, star_rating)
+    send_door_state(session, door_id, door_state, door_target, star_rating)
 
 
 def handle_entity_incremental_update(session, data):

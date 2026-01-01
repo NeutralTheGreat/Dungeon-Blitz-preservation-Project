@@ -24,12 +24,14 @@ def build_fake_login_packet(token):
     body = bb.to_bytes()
     return struct.pack(">HH", 0x1F, len(body)) + body
 
-def DEVFLAG_STANDALONE_CLIENT(session, data, conn):
+def DEVFLAG_STANDALONE_CLIENT(session, data):
     br = BitReader(data[4:])
     value = br.read_method_9()
-    Boolean = br.read_method_15()
-    print(f" value : {value} : Boolean {Boolean}  ")
+    boolean = br.read_method_15()
+
+    print(f" value : {value} : Boolean {boolean}")
+
     for t, (char, _, _) in GS.pending_world.items():
         if session.user_id is None or char.get("user_id") == session.user_id:
-            handle_gameserver_login(session, build_fake_login_packet(t), conn)
+            handle_gameserver_login(session, build_fake_login_packet(t))
             return

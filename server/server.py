@@ -218,33 +218,33 @@ def handle_client(session: ClientSession):
             # Login.py
             ############################################
             if pkt == 0x11:
-                handle_login_version(session, data, conn)
+                handle_login_version(session, data)
             elif pkt == 0x13:
-                handle_login_create(session, data, conn)
+                handle_login_create(session, data)
             elif pkt == 0x14:
-                handle_login_authenticate(session, data, conn)
+                handle_login_authenticate(session, data)
             elif pkt == 0x17:
-                handle_login_character_create(session, data, conn)
+                handle_login_character_create(session, data)
             elif pkt == 0x16:
-                handle_character_select(session, data, conn)
+                handle_character_select(session, data)
             elif pkt == 0x1f:  # Welcome / Player_Data (finalize level transfer and spawn NPCs)
-                handle_gameserver_login(session, data, conn)
+                handle_gameserver_login(session, data)
             ############################################
 
             # dev.py
             ############################################
             elif pkt == 0x1E:
-                DEVFLAG_STANDALONE_CLIENT(session, data, conn)
+                DEVFLAG_STANDALONE_CLIENT(session, data)
             ############################################
 
             # level_config.py
             ############################################
             elif pkt == 0x2D:
-                handle_open_door(session, data, conn)
+                handle_open_door(session, data)
             elif pkt == 0x1D:  # Transfer Ready (prepare ENTER_WORLD, do NOT finalize session.current_level)
-                handle_level_transfer_request(session, data, conn)
+                handle_level_transfer_request(session, data)
             elif pkt == 0x41:
-                handle_request_door_state(session, data, conn)
+                handle_request_door_state(session, data)
             elif pkt == 0x07:
                 handle_entity_incremental_update(session, data)
             ############################################

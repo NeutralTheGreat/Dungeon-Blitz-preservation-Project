@@ -17,7 +17,7 @@ from globals import SECRET, _level_add, all_sessions, GS
 from level_config import LEVEL_CONFIG, get_spawn_coordinates
 from socials import get_group_for_session, online_group_members, update_session_group_cache, build_group_update_packet
 
-def handle_login_version(session, data, conn):
+def handle_login_version(session, data):
     br = BitReader(data[4:])
     client_version = br.read_method_9()
 
@@ -32,10 +32,10 @@ def handle_login_version(session, data, conn):
     payload = struct.pack(">H", len(utf_bytes)) + utf_bytes
     pkt = struct.pack(">HH", 0x12, len(payload)) + payload
 
-    conn.sendall(pkt)
+    session.conn.sendall(pkt)
 
 
-def handle_login_create(session, data, conn):
+def handle_login_create(session, data):
     br = BitReader(data[4:])
     client_facebook_id = br.read_method_26()
     client_kongregate_id = br.read_method_26()
@@ -48,11 +48,11 @@ def handle_login_create(session, data, conn):
     session.char_list = load_characters(session.user_id)
 
     pkt = build_login_character_list_bitpacked(session.user_id, session.char_list)
-    conn.sendall(pkt)
+    session.conn.sendall(pkt)
 
     print(f"[{session.addr}] [0x13] Login/Create OK for {email} → {len(session.char_list)} characters")
 
-def handle_login_authenticate(session, data, conn):
+def handle_login_authenticate(session, data):
     br = BitReader(data[4:])
     client_facebook_id = br.read_method_26()
     client_kongregate_id = br.read_method_26()
@@ -64,7 +64,9 @@ def handle_login_authenticate(session, data, conn):
     user_id = accounts.get(email)
 
     if not user_id:
-        conn.sendall(build_popup_packet("Account not found", disconnect=True))
+        session.conn.sendall(
+            build_popup_packet("Account not found", disconnect=True)
+        )
         print(f"[{session.addr}] [0x14] Login failed — no account for {email}")
         return
 
@@ -73,11 +75,11 @@ def handle_login_authenticate(session, data, conn):
     session.authenticated = True
 
     pkt = build_login_character_list_bitpacked(session.user_id, session.char_list)
-    conn.sendall(pkt)
+    session.conn.sendall(pkt)
 
     print(f"[{session.addr}] [0x14] Login success for {email} → user_id={user_id}, {len(session.char_list)} chars")
 
-def handle_login_character_create(session, data, conn):
+def handle_login_character_create(session, data):
     br = BitReader(data[4:])
     name = br.read_method_26()
     class_name = br.read_method_26()
@@ -92,7 +94,7 @@ def handle_login_character_create(session, data, conn):
     pant_color = br.read_method_20(EntType.CHAR_COLOR_BITSTOSEND)
 
     if is_character_name_taken(name):
-        conn.sendall(build_popup_packet(
+        session.conn.sendall(build_popup_packet(
             "Character name is unavailable. Please choose a new name.",
             disconnect=False
         ))
@@ -150,12 +152,12 @@ def handle_login_character_create(session, data, conn):
         char=new_char,
     )
 
-    conn.sendall(pkt)
+    session.conn.sendall(pkt)
     GS.pending_world[tk] = (new_char, current_level, prev_level)
 
     print(f"[{session.addr}] [0x17] Character '{name}' created → entering {current_level} (tk={tk})")
 
-def handle_character_select(session, data, conn):
+def handle_character_select(session, data):
     br = BitReader(data[4:])
     name = br.read_method_26()
 
@@ -205,11 +207,11 @@ def handle_character_select(session, data, conn):
             char=c,
         )
 
-        conn.sendall(pkt)
+        session.conn.sendall(pkt)
         GS.pending_world[tk] = (c, current_level, prev_level)
         print(f"[{session.addr}] [0x16] Transfer begin: {name}, tk={tk}, level={current_level}")
 
-def handle_gameserver_login(session, data, conn):
+def handle_gameserver_login(session, data):
     br = BitReader(data[4:])
     token        = br.read_method_9()
     previous_swf_name = br.read_method_26()
@@ -278,7 +280,7 @@ def handle_gameserver_login(session, data, conn):
         send_extended=first_login,
     )
 
-    conn.sendall(welcome)
+    session.conn.sendall(welcome)
 
     gid, group = get_group_for_session(session)
     if gid and group:
@@ -298,6 +300,8 @@ def handle_gameserver_login(session, data, conn):
 
     for npc in npcs.values():
         payload = Send_Entity_Data(npc)
-        conn.sendall(struct.pack(">HH", 0x0F, len(payload)) + payload)
+        session.conn.sendall(
+            struct.pack(">HH", 0x0F, len(payload)) + payload
+        )
         session.entities[npc["id"]] = npc
     #print(f"[{session.addr}] NPCs synced for level {session.current_level}")
