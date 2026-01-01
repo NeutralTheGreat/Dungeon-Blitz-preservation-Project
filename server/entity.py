@@ -337,7 +337,7 @@ def send_existing_entities_to_joiner(joiner, all_sessions):
                 pkt = Send_Entity_Data(ent_dict)
                 framed = struct.pack(">HH", 0x0F, len(pkt)) + pkt
                 joiner.conn.sendall(framed)
-                print(f"[JOIN] Sent player {ent_dict['name']} (eid={other.clientEntID}) → {joiner.addr}")
+                #print(f"[JOIN] Sent player {ent_dict['name']} (eid={other.clientEntID}) → {joiner.addr}")
             except Exception as ex:
                 print(f"[JOIN] Error sending player {ent_dict['name']} to {joiner.addr}: {ex}")
 
@@ -482,7 +482,7 @@ def handle_entity_full_update(session, data, all_sessions):
                         and other.current_level == session.current_level
                 ):
                     other.conn.sendall(framed)
-                    print(f"[JOIN] Broadcasted Send_Entity_Data for {ent_dict['name']} → {other.addr}")
+                    #print(f"[JOIN] Broadcasted Send_Entity_Data for {ent_dict['name']} → {other.addr}")
 
 def ensure_level_npcs(level_name):
     """
