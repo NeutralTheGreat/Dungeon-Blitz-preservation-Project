@@ -11,6 +11,48 @@ from globals import build_start_skit_packet, send_premium_purchase
 from missions import get_mission_extra
 
 
+def handle_create_gearset(session, data):
+    br = BitReader(data[4:])
+    slot_idx = br.read_method_20(GearType.const_348)
+
+    char = next(
+        (c for c in session.char_list
+         if c.get("name") == session.current_character),
+        None
+    )
+    gearsets = char.setdefault("gearSets", [])
+
+    while len(gearsets) <= slot_idx:
+        if len(gearsets) >= Game.const_1057:
+            return
+
+        gearsets.append({
+            "name": f"GearSet {len(gearsets) + 1}",
+            "slots": [0] * EntType.MAX_SLOTS
+        })
+
+    save_characters(session.user_id, session.char_list)
+
+def handle_name_gearset(session, data):
+    br = BitReader(data[4:])
+    slot_idx = br.read_method_20(GearType.const_348)
+    name = br.read_method_26()
+
+    char = next(
+        (c for c in session.char_list
+         if c.get("name") == session.current_character),
+        None
+    )
+
+    gearsets = char.get("gearSets", [])
+    if slot_idx >= len(gearsets):
+        print("ERROR: gearset does not exist")
+        return
+
+    gearsets[slot_idx]["name"] = name
+
+    save_characters(session.user_id, session.char_list)
+
 #TODO...
 def handle_queue_potion(session, data):
     br = BitReader(data[4:])
@@ -301,47 +343,6 @@ def handle_change_look(session, raw_data, all_sessions):
                 gender, hair_color, skin_color
             )
 
-def handle_create_gearset(session, data):
-    br = BitReader(data[4:])
-    slot_idx = br.read_method_20(GearType.const_348)
-
-    char = next(
-        (c for c in session.char_list
-         if c.get("name") == session.current_character),
-        None
-    )
-    gearsets = char.setdefault("gearSets", [])
-
-    while len(gearsets) <= slot_idx:
-        if len(gearsets) >= Game.const_1057:
-            return
-
-        gearsets.append({
-            "name": f"GearSet {len(gearsets) + 1}",
-            "slots": [0] * EntType.MAX_SLOTS
-        })
-
-    save_characters(session.user_id, session.char_list)
-
-def handle_name_gearset(session, data):
-    br = BitReader(data[4:])
-    slot_idx = br.read_method_20(GearType.const_348)
-    name = br.read_method_26()
-
-    char = next(
-        (c for c in session.char_list
-         if c.get("name") == session.current_character),
-        None
-    )
-
-    gearsets = char.get("gearSets", [])
-    if slot_idx >= len(gearsets):
-        print("ERROR: gearset does not exist")
-        return
-
-    gearsets[slot_idx]["name"] = name
-
-    save_characters(session.user_id, session.char_list)
 
 def handle_apply_gearset(session, raw_data):
     """
@@ -432,15 +433,11 @@ def handle_update_equipment(session, raw_data):
         return
 
     save_characters(session.user_id, session.char_list)
-    session.conn.sendall(raw_data)
+
 
 
 def handle_hp_increase_notice(session, data):
        pass
-
-
-#handled
-#############################################
 
 def handle_apply_dyes(session, data, all_sessions):
     br = BitReader(data[4:])
