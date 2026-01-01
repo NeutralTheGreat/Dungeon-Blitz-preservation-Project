@@ -33,7 +33,7 @@ def handle_login_version(session, data, conn):
     pkt = struct.pack(">HH", 0x12, len(payload)) + payload
 
     conn.sendall(pkt)
-    print(f"[{session.addr}] → Sent 0x12 login challenge sid={sid:04x} hash={digest}")
+
 
 def handle_login_create(session, data, conn):
     br = BitReader(data[4:])
@@ -288,7 +288,7 @@ def handle_gameserver_login(session, data, conn):
         for member, _ in members:
             member.conn.sendall(pkt)
 
-    print(f"[{session.addr}] Welcome: {char['name']} (token {token})")
+    #print(f"[{session.addr}] Welcome: {char['name']} (token {token})")
 
     npcs = ensure_level_npcs(session.current_level)
     if AI_ENABLED:

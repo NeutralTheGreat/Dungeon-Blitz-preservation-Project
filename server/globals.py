@@ -139,7 +139,7 @@ def handle_entity_destroy_server(session, entity_id: int, all_sessions: list):
         if s.player_spawned and s.current_level == session.current_level:
             s.conn.sendall(pkt)
 
-    print(f"[EntityDestroy] Entity {entity_id} destroyed")
+    #print(f"[EntityDestroy] Entity {entity_id} destroyed")
 
 
 def send_forge_reroll_packet(

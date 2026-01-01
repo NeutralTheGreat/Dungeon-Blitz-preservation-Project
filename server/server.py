@@ -146,11 +146,11 @@ class ClientSession:
 
         save_characters(self.user_id, self.char_list)
 
-        print(
-            f"[{self.addr}] Saved player position: "
-            f"{char['CurrentLevel']['name']} → "
-            f"({char['CurrentLevel']['x']}, {char['CurrentLevel']['y']})"
-        )
+        #print(
+        #    f"[{self.addr}] Saved player position: "
+        #    f"{char['CurrentLevel']['name']} → "
+        #    f"({char['CurrentLevel']['x']}, {char['CurrentLevel']['y']})"
+        #)
 
     def close_connection(self):
 
@@ -158,7 +158,7 @@ class ClientSession:
 
         if self.player_spawned and self.clientEntID is not None:
             handle_entity_destroy_server(self, self.clientEntID, all_sessions=all_sessions)
-            print("destroyed entity removal")
+            #print("destroyed entity removal")
 
         try:
             self.conn.close()

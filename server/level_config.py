@@ -238,7 +238,7 @@ def handle_open_door(session, data, conn):
     door_id = br.read_method_9()
 
     current_level = session.current_level
-    print(f"[{session.addr}] OpenDoor request: doorID={door_id}, current_level={current_level}")
+    #print(f"[{session.addr}] OpenDoor request: doorID={door_id}, current_level={current_level}")
 
     # --- Resolve base mapping ---
     target_level = DOOR_MAP.get((current_level, door_id))
@@ -263,7 +263,7 @@ def handle_open_door(session, data, conn):
     resp = struct.pack(">HH", 0x2E, len(payload)) + payload
     conn.sendall(resp)
 
-    print(f"[{session.addr}] Sent DOOR_TARGET: doorID={door_id}, level='{target_level}'")
+    #print(f"[{session.addr}] Sent DOOR_TARGET: doorID={door_id}, level='{target_level}'")
 
 
 def handle_level_transfer_request(session, data, conn):
@@ -401,10 +401,7 @@ def handle_level_transfer_request(session, data, conn):
     )
 
     conn.sendall(pkt_out)
-    print(
-        f"[{session.addr}] Sent ENTER_WORLD with token {new_token} "
-        f"for {target_level} → pos=({new_x},{new_y})"
-    )
+    #print(f"[{session.addr}] Sent ENTER_WORLD with token {new_token} "f"for {target_level} → pos=({new_x},{new_y})")
 
 def send_door_state(conn, door_id, door_state, door_target, star_rating=None):
     bb = BitBuffer()
