@@ -7,7 +7,7 @@ from bitreader import BitReader
 from constants import GearType, EntType, DyeType, Entity, class_3
 from BitBuffer import BitBuffer
 from constants import get_dye_color
-from globals import build_start_skit_packet, send_premium_purchase
+from globals import build_start_skit_packet, send_premium_purchase, GS
 from missions import get_mission_extra
 
 
@@ -225,7 +225,7 @@ def send_look_update_packet(session, entity_id, head, hair, mouth, face, gender,
     packet_type = 0x8F
     session.conn.sendall(struct.pack(">HH", packet_type, len(payload)) + payload)
 
-def handle_change_look(session, raw_data, all_sessions):
+def handle_change_look(session, raw_data):
     """
     Handle the look change request from the client (packet 0x8E).
     Updates live entity, saved character data, persists, and broadcasts.
@@ -290,7 +290,7 @@ def handle_change_look(session, raw_data, all_sessions):
     )
 
     # ─── (6) Broadcast to nearby clients ────────────────────────────────────────
-    for other in all_sessions:
+    for other in GS.all_sessions:
         if (other is not session and
             other.player_spawned and
             other.current_level == session.current_level):
@@ -305,7 +305,7 @@ def handle_change_look(session, raw_data, all_sessions):
 def handle_hp_increase_notice(session, data):
        pass
 
-def handle_apply_dyes(session, data, all_sessions):
+def handle_apply_dyes(session, data):
     br = BitReader(data[4:])
     try:
         entity_id = br.read_method_4()
@@ -430,7 +430,7 @@ def handle_apply_dyes(session, data, all_sessions):
 
     # Sync to self + broadcast
     for target in [session] + [
-        o for o in all_sessions
+        o for o in GS.all_sessions
         if o is not session and o.player_spawned and o.current_level == session.current_level
     ]:
         send_dye_sync_packet(
@@ -535,7 +535,7 @@ def handle_linkupdater(session, data):
     #pprint.pprint(props, indent=4)
 
 #TODO... this is just for testing
-def handle_grant_reward(session, data, all_sessions):
+def handle_grant_reward(session, data):
     payload = data[4:]
     br = BitReader(payload, debug=True)
 
@@ -587,6 +587,6 @@ def handle_grant_reward(session, data, all_sessions):
             value1=v1,
             value2=v2
         )
-        for other in all_sessions:
+        for other in GS.all_sessions:
             if other.player_spawned and other.current_level == session.current_level:
                 other.conn.sendall(pkt)

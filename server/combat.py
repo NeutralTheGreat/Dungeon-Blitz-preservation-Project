@@ -106,7 +106,7 @@ def apply_and_broadcast_hp_delta(
         # game client function handlers
        #####################################
 
-def handle_entity_destroy(session, data, all_sessions):
+def handle_entity_destroy(session, data):
     br = BitReader(data[4:])
     entity_id = br.read_method_9()
 
@@ -118,7 +118,7 @@ def handle_entity_destroy(session, data, all_sessions):
         session.clientEntID = None
 
     # Broadcast unchanged packet to other players in same level
-    for other in all_sessions:
+    for other in GS.all_sessions:
         if (
             other is not session
             and other.player_spawned
@@ -126,7 +126,7 @@ def handle_entity_destroy(session, data, all_sessions):
         ):
             other.conn.sendall(data)
 
-def handle_buff_tick_dot(session, data, all_sessions):
+def handle_buff_tick_dot(session, data, ):
     br = BitReader(data[4:])
     target_id = br.read_method_9()
     source_id = br.read_method_9()
@@ -134,7 +134,7 @@ def handle_buff_tick_dot(session, data, all_sessions):
     amount = br.read_method_24()
 
     # Broadcast unchanged packet to other players in same level
-    for other in all_sessions:
+    for other in GS.all_sessions:
         if (
                 other is not session
                 and other.player_spawned
@@ -142,7 +142,7 @@ def handle_buff_tick_dot(session, data, all_sessions):
         ):
             other.conn.sendall(data)
 
-def handle_respawn_broadcast(session, data, all_sessions):
+def handle_respawn_broadcast(session, data):
     br = BitReader(data[4:])
 
     ent_id = br.read_method_9()
@@ -168,7 +168,7 @@ def handle_respawn_broadcast(session, data, all_sessions):
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x82, len(payload)) + payload
 
-    for other in all_sessions:
+    for other in GS.all_sessions:
         if other is not session and other.player_spawned and other.current_level == session.current_level:
             other.conn.sendall(pkt)
 
@@ -202,7 +202,7 @@ def handle_request_respawn(session, data):
 
     session.conn.sendall(struct.pack(">HH", 0x80, len(payload)) + payload)
 
-def handle_power_hit(session, data, all_sessions):
+def handle_power_hit(session, data):
     br = BitReader(data[4:])
     target_entity_id = br.read_method_9()
     source_entity_id = br.read_method_9()
@@ -221,7 +221,7 @@ def handle_power_hit(session, data, all_sessions):
     is_critical = br.read_method_15()
 
     # Forward packet unchanged to other clients in same level
-    for other in all_sessions:
+    for other in GS.all_sessions:
         if (
                 other is not session
                 and other.player_spawned
@@ -229,7 +229,7 @@ def handle_power_hit(session, data, all_sessions):
         ):
             other.conn.sendall(data)
 
-def handle_projectile_explode(session, data, all_sessions):
+def handle_projectile_explode(session, data):
     br = BitReader(data[4:])
     entity_id      = br.read_method_9()
     remote_missile = br.read_method_9()
@@ -238,7 +238,7 @@ def handle_projectile_explode(session, data, all_sessions):
     is_crit        = br.read_method_15()
 
     # Broadcast unchanged packet to all other players in same level
-    for other in all_sessions:
+    for other in GS.all_sessions:
         if (
             other is not session
             and other.player_spawned
@@ -262,7 +262,7 @@ def handle_projectile_explode(session, data, all_sessions):
 #
 #   In the future, server must store these values to correctly
 #   handle timed buff removal and expiration logic.
-def handle_add_buff(session, data, all_sessions):
+def handle_add_buff(session, data):
     br = BitReader(data[4:])
     entity_id    = br.read_method_9()
     caster_id    = br.read_method_9()
@@ -285,7 +285,7 @@ def handle_add_buff(session, data, all_sessions):
                 mod_values.append(mod_value)
 
     # Broadcast unchanged packet to other clients in same level
-    for other in all_sessions:
+    for other in GS.all_sessions:
         if (
             other is not session
             and other.player_spawned
@@ -306,14 +306,14 @@ TODO:
         • start time
     so it can send timed buff removals correctly.
 """
-def handle_remove_buff(session, data, all_sessions):
+def handle_remove_buff(session, data):
     br = BitReader(data[4:])
     entity_id      = br.read_method_9()
     buff_type_id   = br.read_method_9()
     instance_id    = br.read_method_9()
 
     # Broadcast packet unchanged to other players in the same level
-    for other in all_sessions:
+    for other in GS.all_sessions:
         if (
             other is not session
             and other.player_spawned
@@ -321,11 +321,11 @@ def handle_remove_buff(session, data, all_sessions):
         ):
             other.conn.sendall(data)
 
-def handle_change_max_speed(session, data, all_sessions):
+def handle_change_max_speed(session, data):
     br = BitReader(data[4:])
     entity_id     = br.read_method_9()
     speed_mod_int = br.read_method_9()
-    for other in all_sessions:
+    for other in GS.all_sessions:
         if (
             other.player_spawned
             and other.current_level == session.current_level
@@ -333,7 +333,7 @@ def handle_change_max_speed(session, data, all_sessions):
             other.conn.sendall(data)
 
 
-def handle_power_cast(session, data, all_sessions):
+def handle_power_cast(session, data):
     br = BitReader(data[4:])
 
     ent_id   = br.read_method_9()
@@ -377,7 +377,7 @@ def handle_power_cast(session, data, all_sessions):
             mana_cost = br.read_method_6(MANA_BITS)
 
     # Broadcast unchanged packet
-    for other in all_sessions:
+    for other in GS.all_sessions:
         if (
             other is not session
             and other.player_spawned
@@ -385,14 +385,14 @@ def handle_power_cast(session, data, all_sessions):
         ):
             other.conn.sendall(data)
 
-def handle_change_offset_y(session, data, all_sessions):
+def handle_change_offset_y(session, data):
     br = BitReader(data[4:])
     entity_id = br.read_method_9()
     offset_y  = br.read_method_739()
 
     pkt = build_change_offset_y_packet(entity_id, offset_y)
 
-    for s in all_sessions:
+    for s in GS.all_sessions:
         if s is not session and s.player_spawned and s.current_level == session.current_level:
             try:
                 s.conn.sendall(pkt)
@@ -401,7 +401,7 @@ def handle_change_offset_y(session, data, all_sessions):
 
 
 # Sent when equipment, runes, or stats change and HP
-def handle_char_regen(session, data, all_sessions):
+def handle_char_regen(session, data, ):
     br = BitReader(data[4:])
     ent_id = br.read_method_9()
     delta  = br.read_method_24()
@@ -410,13 +410,13 @@ def handle_char_regen(session, data, all_sessions):
         source_session=session,
         ent_id=ent_id,
         delta=delta,
-        all_sessions=all_sessions,
+        all_sessions=GS.all_sessions,
         source_name="GEAR/STAT",
     )
 
 
 # Sent periodically by the client when passive regeneration occurs.
-def handle_char_regen_tick(session, data, all_sessions):
+def handle_char_regen_tick(session, data, ):
     br = BitReader(data[4:])
     ent_id = br.read_method_9()
     delta  = br.read_method_24()
@@ -425,7 +425,7 @@ def handle_char_regen_tick(session, data, all_sessions):
         source_session=session,
         ent_id=ent_id,
         delta=delta,
-        all_sessions=all_sessions,
+        all_sessions=GS.all_sessions,
         source_name="REGEN",
     )
 
@@ -527,7 +527,7 @@ def handle_equip_rune(session,  data):
     packet = struct.pack(">HH", 0xB0, len(payload)) + payload
     session.conn.sendall(packet)
 
-def handle_update_single_gear(session, data, all_sessions):
+def handle_update_single_gear(session, data):
     br = BitReader(data[4:])
 
     entity_id = br.read_method_4()
@@ -575,7 +575,7 @@ def handle_update_single_gear(session, data, all_sessions):
     eq[slot] = gear_data
 
     save_characters(session.user_id, session.char_list)
-    broadcast_gear_change(session, all_sessions)
+    broadcast_gear_change(session, GS.all_sessions)
 
 
 def handle_update_equipment(session, data):

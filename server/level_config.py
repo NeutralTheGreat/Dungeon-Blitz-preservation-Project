@@ -487,7 +487,7 @@ def handle_request_door_state(session, data, conn):
     send_door_state(conn, door_id, door_state, door_target, star_rating)
 
 
-def handle_entity_incremental_update(session, data, all_sessions):
+def handle_entity_incremental_update(session, data):
     payload = data[4:]
     br = BitReader(payload)
     entity_id = br.read_method_4()
@@ -554,6 +554,6 @@ def handle_entity_incremental_update(session, data, all_sessions):
                         char["CurrentLevel"]["y"] = new_y
                     break
 
-    for other in all_sessions:
+    for other in GS.all_sessions:
         if other is not session and other.player_spawned and other.current_level == session.current_level:
             other.conn.sendall(data)

@@ -125,7 +125,7 @@ def handle_zone_panel_request(session):
     players = GS.level_players.get(level)
     send_zone_players_update(session, players)
 
-def handle_public_chat(session, data, all_sessions):
+def handle_public_chat(session, data):
     br = BitReader(data[4:])
     entity_id = br.read_method_9()
     message   = br.read_method_13()
@@ -133,7 +133,7 @@ def handle_public_chat(session, data, all_sessions):
     print(f"[{get_active_character_name(session)}] Says : \"{message}\"")
 
     # Forward raw unmodified packet to other players in the same level
-    for other in all_sessions:
+    for other in GS.all_sessions:
         if other is session:
             continue
         if not other.player_spawned:
@@ -144,14 +144,14 @@ def handle_public_chat(session, data, all_sessions):
         other.conn.sendall(data)
 
 
-def handle_private_message(session, data, all_sessions):
+def handle_private_message(session, data):
     br = BitReader(data[4:])
     recipient_name = br.read_method_13()
     message        = br.read_method_13()
 
     # --- Find recipient session ---
     recipient_session = next(
-        (s for s in all_sessions
+        (s for s in GS.all_sessions
          if s.authenticated
          and s.current_character
          and s.current_character.lower() == recipient_name.lower()),
@@ -185,7 +185,7 @@ def handle_private_message(session, data, all_sessions):
 
     print(f"[PM-ERR] {sender_name} → {recipient_name} (NOT FOUND)")
 
-def handle_room_thought(session, data, all_sessions):
+def handle_room_thought(session, data):
     br = BitReader(data[4:])
 
     entity_id = br.read_method_4()
@@ -195,14 +195,14 @@ def handle_room_thought(session, data, all_sessions):
 
     pkt = build_room_thought_packet(entity_id, text)
 
-    for s in all_sessions:
+    for s in GS.all_sessions:
         if s.player_spawned and s.current_level == level:
             try:
                 s.conn.sendall(pkt)
             except:
                 pass
 
-def handle_start_skit(session, data, all_sessions):
+def handle_start_skit(session, data):
     br = BitReader(data[4:])
 
     entity_id = br.read_method_9()
@@ -211,7 +211,7 @@ def handle_start_skit(session, data, all_sessions):
 
     pkt = build_room_thought_packet(entity_id, text)
 
-    for other in all_sessions:
+    for other in GS.all_sessions:
         if other.player_spawned and other.current_level == session.current_level:
             try:
                 other.conn.sendall(pkt)
@@ -221,25 +221,25 @@ def handle_start_skit(session, data, all_sessions):
     print(f"[SKIT] Entity {entity_id} says: '{text}'")
 
 
-def handle_emote_begin(session, data, all_sessions):
+def handle_emote_begin(session, data):
     br = BitReader(data[4:])
 
     entity_id = br.read_method_4()
     emote = br.read_method_13()
 
-    for other in all_sessions:
+    for other in GS.all_sessions:
         if (other is not session
             and other.player_spawned
             and other.current_level == session.current_level):
             other.conn.sendall(data)
 
 
-def handle_group_invite(session, data, all_sessions):
+def handle_group_invite(session, data):
     br = BitReader(data[4:])
     invitee_name = br.read_method_13()
 
     invitee = next((
-        s for s in all_sessions
+        s for s in GS.all_sessions
         if s.authenticated
         and s.current_character
         and s.current_character.lower() == invitee_name.lower()
@@ -332,14 +332,14 @@ def build_group_update_packet(members):
     return struct.pack(">HH", 0x75, len(payload)) + payload
 
 
-def handle_query_message_answer(session, data, all_sessions):
+def handle_query_message_answer(session, data):
     br = BitReader(data[4:])
     token    = br.read_method_9()
     name     = br.read_method_26()
     accepted = br.read_method_15()
 
     # Find inviter by entity ID
-    inviter = next((s for s in all_sessions if s.clientEntID == token), None)
+    inviter = next((s for s in GS.all_sessions if s.clientEntID == token), None)
     if not inviter:
         return
 
@@ -364,7 +364,7 @@ def handle_query_message_answer(session, data, all_sessions):
     state.add_member(gid, invitee_name)
 
     # Build full party list for packet
-    members = online_group_members(group, all_sessions)
+    members = online_group_members(group, GS.all_sessions)
     update_session_group_cache(gid, members)
 
     packet = build_group_update_packet(members)
@@ -373,7 +373,7 @@ def handle_query_message_answer(session, data, all_sessions):
 
 
 # client only sends this when the player is in a party
-def handle_map_location_update(session, data, all_sessions):
+def handle_map_location_update(session, data):
     br = BitReader(data[4:])
 
     map_x = br.read_method_236()
@@ -387,7 +387,7 @@ def handle_map_location_update(session, data, all_sessions):
         return
 
     # Broadcast to GROUP only
-    for member, _ in online_group_members(group, all_sessions):
+    for member, _ in online_group_members(group, GS.all_sessions):
         if member is session:
             continue  # skip sender
 
@@ -395,7 +395,7 @@ def handle_map_location_update(session, data, all_sessions):
         member.conn.sendall(pkt)
 
 
-def handle_group_kick(session, data, all_sessions):
+def handle_group_kick(session, data):
     br = BitReader(data[4:])
     target_name = br.read_method_26()
     target_key = target_name.strip().lower()
@@ -413,7 +413,7 @@ def handle_group_kick(session, data, all_sessions):
     state.remove_member(target_name)
 
     # Find target session (if online)
-    target_sess = find_online_session(all_sessions, target_name)
+    target_sess = find_online_session(GS.all_sessions, target_name)
 
     send_chat_status(target_sess, "You have been removed from the party.") if target_sess else None
     send_chat_status(session, f"You removed {target_name} from the party.")
@@ -426,7 +426,7 @@ def handle_group_kick(session, data, all_sessions):
         if group:
             # there is exactly one member left
             remaining_name = group["members"][0]
-            remaining_sess = find_online_session(all_sessions, remaining_name)
+            remaining_sess = find_online_session(GS.all_sessions, remaining_name)
 
             state.disband_group(gid)
 
@@ -444,7 +444,7 @@ def handle_group_kick(session, data, all_sessions):
         return
 
     # Group still has >= 2 members
-    members = online_group_members(group, all_sessions)
+    members = online_group_members(group, GS.all_sessions)
     update_session_group_cache(gid, members)
 
     pkt = build_group_update_packet(members)
@@ -461,7 +461,7 @@ def handle_group_kick(session, data, all_sessions):
         target_sess.conn.sendall(build_empty_group_packet())
 
 
-def handle_group_leave(session, data, all_sessions):
+def handle_group_leave(session, data):
     gid, group = get_group_for_session(session)
     if not group:
         send_chat_status(session, "You are not in a party.")
@@ -488,7 +488,7 @@ def handle_group_leave(session, data, all_sessions):
     remaining_group = None
     if not gid:
         # see if any online member still has a group
-        for s in all_sessions:
+        for s in GS.all_sessions:
             if s is session:
                 continue
             g2, grp2 = get_group_for_session(s)
@@ -507,7 +507,7 @@ def handle_group_leave(session, data, all_sessions):
             state.disband_group(remaining_gid)
 
             for name in names:
-                s = find_online_session(all_sessions, name)
+                s = find_online_session(GS.all_sessions, name)
                 if not s:
                     continue
                 s.group_id = None
@@ -517,7 +517,7 @@ def handle_group_leave(session, data, all_sessions):
         return
 
     # Party still has 2+ members
-    members = online_group_members(remaining_group, all_sessions)
+    members = online_group_members(remaining_group, GS.all_sessions)
     update_session_group_cache(remaining_gid, members)
 
     for m, _ in members:
@@ -528,7 +528,7 @@ def handle_group_leave(session, data, all_sessions):
         s.conn.sendall(pkt)
 
 
-def handle_group_leader(session, data, all_sessions):
+def handle_group_leader(session, data):
     br = BitReader(data[4:])
     target_name = br.read_method_26()
     target_key = target_name.strip().lower()
@@ -542,14 +542,14 @@ def handle_group_leader(session, data, all_sessions):
     state.set_leader(gid, target_name)
 
     # Notify members
-    target_sess = find_online_session(all_sessions, target_name)
+    target_sess = find_online_session(GS.all_sessions, target_name)
     send_chat_status(session, f"You made {target_name} the party leader.")
     if target_sess:
         send_chat_status(target_sess, "You are now the party leader.")
 
     # Notify others
     gid, group = get_group_for_session(session)
-    members = online_group_members(group, all_sessions)
+    members = online_group_members(group, GS.all_sessions)
     for m, _ in members:
         if m not in (session, target_sess):
             send_chat_status(m, f"{target_name} is now the party leader.")
@@ -562,7 +562,7 @@ def handle_group_leader(session, data, all_sessions):
         s.conn.sendall(pkt)
 
 
-def handle_send_group_chat(session, data, all_sessions):
+def handle_send_group_chat(session, data):
     br = BitReader(data[4:])
     message = br.read_method_26()
 
@@ -579,5 +579,5 @@ def handle_send_group_chat(session, data, all_sessions):
     print(f" [Group chat] {sender_name} Says : {message}")
 
     # Send to ALL ONLINE members including sender
-    for m, _ in online_group_members(group, all_sessions):
+    for m, _ in online_group_members(group, GS.all_sessions):
         m.conn.sendall(pkt)

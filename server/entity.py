@@ -341,7 +341,7 @@ def send_existing_entities_to_joiner(joiner, all_sessions):
             except Exception as ex:
                 print(f"[JOIN] Error sending player {ent_dict['name']} to {joiner.addr}: {ex}")
 
-def handle_entity_full_update(session, data, all_sessions):
+def handle_entity_full_update(session, data):
     """
     Handle a full entity spawn/update (packet type 0x08)
     - Parses and stores entity info.
@@ -452,7 +452,7 @@ def handle_entity_full_update(session, data, all_sessions):
         pkt = Send_Entity_Data(ent_dict)
         framed = struct.pack(">HH", 0x0F, len(pkt)) + pkt
 
-        for other in all_sessions:
+        for other in GS.all_sessions:
             if (
                     other is not session
                     and other.player_spawned
@@ -464,7 +464,7 @@ def handle_entity_full_update(session, data, all_sessions):
     # First-time world load for this player
     if not session.player_spawned:
         session.player_spawned = True
-        send_existing_entities_to_joiner(session, all_sessions)
+        send_existing_entities_to_joiner(session, GS.all_sessions)
 
         # Broadcast THIS player’s spawn to others
         char = next(
@@ -475,7 +475,7 @@ def handle_entity_full_update(session, data, all_sessions):
             ent_dict = build_entity_dict(entity_id, char, props)
             pkt = Send_Entity_Data(ent_dict)
             framed = struct.pack(">HH", 0x0F, len(pkt)) + pkt
-            for other in all_sessions:
+            for other in GS.all_sessions:
                 if (
                         other is not session
                         and other.player_spawned

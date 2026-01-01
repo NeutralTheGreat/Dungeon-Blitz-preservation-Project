@@ -246,7 +246,7 @@ def handle_client(session: ClientSession):
             elif pkt == 0x41:
                 handle_request_door_state(session, data, conn)
             elif pkt == 0x07:
-                handle_entity_incremental_update(session, data, all_sessions)
+                handle_entity_incremental_update(session, data)
             ############################################
 
             # forge.py
@@ -302,41 +302,41 @@ def handle_client(session: ClientSession):
             # entity.py
             ############################################
             elif pkt == 0x08:
-                handle_entity_full_update(session, data, all_sessions)
+                handle_entity_full_update(session, data)
             ############################################
 
             # combat.py
             ############################################
             elif pkt == 0x0D:
-                handle_entity_destroy(session, data, all_sessions)
+                handle_entity_destroy(session, data)
             elif pkt == 0x79:
-                handle_buff_tick_dot(session, data, all_sessions)
+                handle_buff_tick_dot(session, data)
             elif pkt == 0x82:
-                handle_respawn_broadcast(session, data, all_sessions)
+                handle_respawn_broadcast(session, data)
             elif pkt == 0x77:
                 handle_request_respawn(session, data)
             elif pkt == 0x0A:
-                handle_power_hit(session, data, all_sessions)
+                handle_power_hit(session, data)
             elif pkt == 0x0E:
-                handle_projectile_explode(session, data, all_sessions)
+                handle_projectile_explode(session, data)
             elif pkt == 0x0B:
-                handle_add_buff(session, data, all_sessions)
+                handle_add_buff(session, data)
             elif pkt == 0x0C:
-                handle_remove_buff(session, data, all_sessions)
+                handle_remove_buff(session, data)
             elif pkt == 0x8A:
-                handle_change_max_speed(session, data, all_sessions)
+                handle_change_max_speed(session, data)
             elif pkt == 0x09:
-                handle_power_cast(session, data, all_sessions)
+                handle_power_cast(session, data)
             elif pkt == 0x7D:
-                handle_change_offset_y(session, data, all_sessions)
+                handle_change_offset_y(session, data)
             elif pkt == 0x78:
-                handle_char_regen(session, data, all_sessions)
+                handle_char_regen(session, data, )
             elif pkt == 0x100:# this one seems to be used only when dev mode has been enabled
-                handle_char_regen_tick(session, data, all_sessions)
+                handle_char_regen_tick(session, data)
             elif pkt == 0xB0:
                 handle_equip_rune(session, data)
             elif pkt == 0x31:
-                handle_update_single_gear(session, data, all_sessions)
+                handle_update_single_gear(session, data)
             elif pkt == 0x30:
                 handle_update_equipment(session, data)
             elif pkt == 0xC7:
@@ -364,37 +364,37 @@ def handle_client(session: ClientSession):
             elif pkt == 0x95:
                 handle_zone_panel_request(session)
             elif pkt == 0x2C:
-                handle_public_chat(session, data, all_sessions)
+                handle_public_chat(session, data)
             elif pkt == 0x46:
-                handle_private_message(session, data, all_sessions)
+                handle_private_message(session, data)
             elif pkt == 0x76:
-                handle_room_thought(session, data, all_sessions)
+                handle_room_thought(session, data)
             elif pkt == 0xC5:
-                handle_start_skit(session, data, all_sessions)
+                handle_start_skit(session, data)
             elif pkt == 0x7E:
-                handle_emote_begin(session, data, all_sessions)
+                handle_emote_begin(session, data)
             elif pkt == 0x65:
-                handle_group_invite(session, data, all_sessions)
+                handle_group_invite(session, data)
             elif pkt == 0x59:
-                handle_query_message_answer(session, data, all_sessions)
+                handle_query_message_answer(session, data)
             elif pkt == 0x8b:
-                handle_map_location_update(session, data, all_sessions)
+                handle_map_location_update(session, data)
             elif pkt == 0x67:
-                handle_group_kick(session, data, all_sessions)
+                handle_group_kick(session, data)
             elif pkt == 0x66:
-                handle_group_leave(session, data, all_sessions)
+                handle_group_leave(session, data)
             elif pkt == 0x68:
-                handle_group_leader(session, data, all_sessions)
+                handle_group_leader(session, data)
             elif pkt == 0x63:
-                handle_send_group_chat(session, data, all_sessions)
+                handle_send_group_chat(session, data)
             ############################################
 
             # pets.py
             ############################################
             elif pkt == 0xB3:
-                handle_equip_pets(session, data, all_sessions)
+                handle_equip_pets(session, data)
             elif pkt == 0xB2:
-                handle_mount_equip_packet(session, data, all_sessions)
+                handle_mount_equip_packet(session, data)
             elif pkt == 0xE4:
                 handle_request_hatchery_eggs(session, data)
             elif pkt == 0xEC:
@@ -440,9 +440,9 @@ def handle_client(session: ClientSession):
             elif pkt == 0x7A:
                 handle_talk_to_npc(session, data)
             elif pkt == 0x8E:
-                handle_change_look(session, data, all_sessions)
+                handle_change_look(session, data)
             elif pkt == 0xBA:
-                handle_apply_dyes(session, data, all_sessions)
+                handle_apply_dyes(session, data)
             elif pkt == 0x107:
                 handle_lockbox_reward(session, data)
             elif pkt == 0x10E:
@@ -450,7 +450,7 @@ def handle_client(session: ClientSession):
             elif pkt == 0xBB:
                 handle_hp_increase_notice(session, data)
             elif pkt == 0x2A:
-                handle_grant_reward(session, data, all_sessions)
+                handle_grant_reward(session, data)
             ############################################
 
             # other
