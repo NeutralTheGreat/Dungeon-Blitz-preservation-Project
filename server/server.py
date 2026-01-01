@@ -325,8 +325,6 @@ def handle_client(session: ClientSession):
                 handle_remove_buff(session, data, all_sessions)
             elif pkt == 0x8A:
                 handle_change_max_speed(session, data, all_sessions)
-            elif pkt == 0x2A:
-                handle_grant_reward(session, data, all_sessions)
             elif pkt == 0x09:
                 handle_power_cast(session, data, all_sessions)
             elif pkt == 0x7D:
@@ -451,6 +449,8 @@ def handle_client(session: ClientSession):
                 handle_queue_potion(session, data)
             elif pkt == 0xBB:
                 handle_hp_increase_notice(session, data)
+            elif pkt == 0x2A:
+                handle_grant_reward(session, data, all_sessions)
             ############################################
 
             # other
