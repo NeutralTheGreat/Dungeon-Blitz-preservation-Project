@@ -130,6 +130,8 @@ def handle_public_chat(session, data, all_sessions):
     entity_id = br.read_method_9()
     message   = br.read_method_13()
 
+    print(f"[{get_active_character_name(session)}] Says : \"{message}\"")
+
     # Forward raw unmodified packet to other players in the same level
     for other in all_sessions:
         if other is session:
@@ -140,7 +142,7 @@ def handle_public_chat(session, data, all_sessions):
             continue
 
         other.conn.sendall(data)
-        print(f"[{get_active_character_name(session)}] Says : \"{message}\"")
+
 
 def handle_private_message(session, data, all_sessions):
     br = BitReader(data[4:])
