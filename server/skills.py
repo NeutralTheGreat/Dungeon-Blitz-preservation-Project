@@ -6,7 +6,7 @@ from constants import get_ability_info
 from globals import send_premium_purchase, send_skill_complete_packet
 from scheduler import scheduler, _on_research_done_for
 
-def handle_skill_trained_claim(session):
+def handle_skill_trained_claim(session, data):
     char = next((c for c in session.char_list if c.get("name") == session.current_character), None)
     if not char:
         print(f"[{session.addr}] [0xD1] No active character")
@@ -30,7 +30,7 @@ def handle_skill_trained_claim(session):
     char["SkillResearch"] = {"abilityID": 0, "ReadyTime": 0}
     save_characters(session.user_id, session.char_list)
 
-def handle_skill_research_cancel_request(session):
+def handle_skill_research_cancel_request(session, data):
     char = next((c for c in session.char_list if c.get("name") == session.current_character), None)
     if not char:
         print(f"[{session.addr}] [0xDD] No active character")
@@ -91,8 +91,8 @@ def handle_start_skill_training(session, data):
     char["SkillResearch"] = {"abilityID": ability_id, "ReadyTime": ready_ts}
     save_characters(session.user_id, session.char_list)
 
-def handle_equip_active_skills(session, raw_data):
-    reader = BitReader(raw_data[4:])
+def handle_equip_active_skills(session, data):
+    reader = BitReader(data[4:])
     updates = {i - 1: reader.read_method_20(7)
                for i in range(1, 9) if reader.remaining_bits() >= 1 and reader.read_method_20(1)}
 

@@ -126,7 +126,7 @@ def handle_entity_destroy(session, data):
         ):
             other.conn.sendall(data)
 
-def handle_buff_tick_dot(session, data, ):
+def handle_buff_tick_dot(session, data):
     br = BitReader(data[4:])
     target_id = br.read_method_9()
     source_id = br.read_method_9()
@@ -401,7 +401,7 @@ def handle_change_offset_y(session, data):
 
 
 # Sent when equipment, runes, or stats change and HP
-def handle_char_regen(session, data, ):
+def handle_char_regen(session, data):
     br = BitReader(data[4:])
     ent_id = br.read_method_9()
     delta  = br.read_method_24()
@@ -416,7 +416,7 @@ def handle_char_regen(session, data, ):
 
 
 # Sent periodically by the client when passive regeneration occurs.
-def handle_char_regen_tick(session, data, ):
+def handle_char_regen_tick(session, data):
     br = BitReader(data[4:])
     ent_id = br.read_method_9()
     delta  = br.read_method_24()

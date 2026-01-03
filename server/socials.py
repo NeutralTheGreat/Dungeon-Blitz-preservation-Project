@@ -120,7 +120,7 @@ def update_session_group_cache(gid, members):
 
 ############################################################
 
-def handle_zone_panel_request(session):
+def handle_zone_panel_request(session, data):
     level = session.current_level
     players = GS.level_players.get(level)
     send_zone_players_update(session, players)

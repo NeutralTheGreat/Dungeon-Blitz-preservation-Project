@@ -225,14 +225,13 @@ def send_look_update_packet(session, entity_id, head, hair, mouth, face, gender,
     packet_type = 0x8F
     session.conn.sendall(struct.pack(">HH", packet_type, len(payload)) + payload)
 
-def handle_change_look(session, raw_data):
+def handle_change_look(session, data):
     """
     Handle the look change request from the client (packet 0x8E).
     Updates live entity, saved character data, persists, and broadcasts.
     """
     # ─── (1) Parse incoming packet ────────────────────────────────────────────────
-    payload = raw_data[4:]  # skip type+length
-    br = BitReader(payload)
+    br = BitReader(data[4:])
 
     head       = br.read_method_26()
     hair       = br.read_method_26()
