@@ -84,9 +84,6 @@ class ClientSession:
     def get_entity(self, entity_id):
         return self.entities.get(entity_id)
 
-    def issue_token(self, char, target_level, previous_level):
-        tk = self.ensure_token(char, target_level=target_level, previous_level=previous_level)
-        return tk
 
     def ensure_token(self, char, target_level=None, previous_level=None):
         key = (self.user_id, char.get("name"))
@@ -161,15 +158,6 @@ class ClientSession:
         if self in all_sessions:
             all_sessions.remove(self)
 
-
-def read_exact(conn, n):
-    buf = b""
-    while len(buf) < n:
-        chunk = conn.recv(n - len(buf))
-        if not chunk:
-            return None
-        buf += chunk
-    return buf
 
 def handle_client(session: ClientSession):
     conn = session.conn
