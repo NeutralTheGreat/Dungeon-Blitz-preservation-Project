@@ -1,5 +1,3 @@
-import os
-import json
 import struct
 
 from BitBuffer import BitBuffer
@@ -22,12 +20,6 @@ from constants import GearType, Game
     }
   ]
 """
-
-def load_class_template(class_name: str) -> dict:
-    path = os.path.join("data", f"{class_name.lower()}_template.json")
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
 
 # ──────────────── Default full gear definitions ────────────────
 # Each sub-list is [GearID, Rune1, Rune2, Rune3, Color1, Color2]

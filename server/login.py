@@ -6,12 +6,12 @@ import secrets
 import struct
 import time
 
-from Character import build_login_character_list_bitpacked, load_class_template
+from Character import build_login_character_list_bitpacked
 from WorldEnter import build_enter_world_packet, Player_Data_Packet
 from accounts import get_or_create_user_id, load_accounts, build_popup_packet, is_character_name_taken, load_characters, save_characters
 from ai_logic import AI_ENABLED, ensure_ai_loop, run_ai_loop
 from bitreader import BitReader
-from constants import EntType
+from constants import EntType, load_class_template
 from entity import Send_Entity_Data, ensure_level_npcs
 from globals import SECRET, _level_add, all_sessions, GS
 from level_config import LEVEL_CONFIG, get_spawn_coordinates

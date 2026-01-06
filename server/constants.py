@@ -383,3 +383,7 @@ MATERIALS_DATA = {
 }
 
 
+def load_class_template(class_name: str) -> dict:
+    path = os.path.join("data", f"{class_name.lower()}_template.json")
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
