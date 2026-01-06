@@ -3,8 +3,8 @@ import struct
 from BitBuffer import BitBuffer
 from accounts import save_characters
 from bitreader import BitReader
-from constants import GearType, Game, EntType
-from globals import GS
+from constants import GearType, Game, EntType, DyeType, Entity, get_dye_color
+from globals import GS, send_premium_purchase
 
 # Hints Do not delete
 """
@@ -257,3 +257,184 @@ def handle_change_look(session, data: bytes) -> None:
             and other.current_level == session.current_level
         ):
             send_look_update_packet(other, **pkt_args)
+
+
+def _parse_apply_dyes_payload(data: bytes) -> tuple[int, dict[int, tuple[int, int]], bool, int | None, int | None]:
+    br = BitReader(data[4:])
+
+    entity_id = br.read_method_4()
+
+    dyes_by_slot: dict[int, tuple[int, int]] = {}
+    for slot in range(1, EntType.MAX_SLOTS):
+        has_pair = bool(br.read_method_20(1))
+        if not has_pair:
+            continue
+        d1 = br.read_method_20(DyeType.BITS)
+        d2 = br.read_method_20(DyeType.BITS)
+        dyes_by_slot[slot] = (d1, d2)
+
+    pay_with_idols = bool(br.read_method_20(1))
+
+    shirt_dye = br.read_method_20(DyeType.BITS) if br.read_method_20(1) else None
+    pants_dye = br.read_method_20(DyeType.BITS) if br.read_method_20(1) else None
+
+    return entity_id, dyes_by_slot, pay_with_idols, shirt_dye, pants_dye
+
+
+def _count_dye_units_changed(eq_gears: list[dict], dyes_by_slot: dict[int, tuple[int, int]]) -> int:
+    """
+    Returns the number of *individual dye channels* changed (0..2 per slot),
+    matching client var_955 behavior.
+    """
+    units = 0
+
+    for slot, (new1, new2) in dyes_by_slot.items():
+        eq_index = slot - 1
+        if eq_index < 0 or eq_index >= len(eq_gears):
+            continue
+
+        gear = eq_gears[eq_index]
+        if not gear or gear.get("gearID", 0) == 0:
+            continue
+
+        old1, old2 = (gear.get("colors") or [0, 0])[:2]
+
+        if new1 and new1 != old1:
+            units += 1
+        if new2 and new2 != old2:
+            units += 1
+
+    return units
+
+
+def handle_apply_dyes(session, data: bytes) -> None:
+    entity_id, dyes_by_slot, pay_with_idols, shirt_dye, pants_dye = _parse_apply_dyes_payload(data)
+
+    char = session.current_char_dict
+    eq  = char.setdefault("equippedGears", [])
+    inv = char.setdefault("inventoryGears", [])
+
+    level = int(char.get("level", char.get("mExpLevel", 1)) or 1)
+    g_idx = min(max(level, 0), len(Entity.Dye_Gold_Cost) - 1)
+    i_idx = min(max(level, 0), len(Entity.Dye_Idols_Cost) - 1)
+    per_gold = int(Entity.Dye_Gold_Cost[g_idx])
+    per_idol = int(Entity.Dye_Idols_Cost[i_idx])
+
+    units = _count_dye_units_changed(eq, dyes_by_slot)
+    gold_cost = per_gold * units
+    idol_cost = per_idol * units
+
+    # Shirt/pants are always free, but must convert dye id to 24 bit color
+    shirt_changed = False
+    pants_changed = False
+
+    if shirt_dye is not None:
+        c = get_dye_color(shirt_dye)
+        if c is not None and c != char.get("shirtColor"):
+            char["shirtColor"] = c
+            shirt_changed = True
+
+    if pants_dye is not None:
+        c = get_dye_color(pants_dye)
+        if c is not None and c != char.get("pantColor"):
+            char["pantColor"] = c
+            pants_changed = True
+
+    # Charge only for gear dye changes
+    if units > 0:
+        if pay_with_idols:
+
+            char["mammothIdols"] = int(char.get("mammothIdols", 0)) - idol_cost
+            send_premium_purchase(session, "Dye", idol_cost)
+        else:
+
+            char["gold"] = int(char.get("gold", 0)) - gold_cost
+
+    gear_ids_touched: set[int] = set()
+
+    for slot, (d1, d2) in dyes_by_slot.items():
+        eq_index = slot - 1
+        if eq_index < 0 or eq_index >= len(eq):
+            continue
+
+        gear = eq[eq_index]
+        if not gear or gear.get("gearID", 0) == 0:
+            continue
+
+        gear["colors"] = [int(d1), int(d2)]
+        gid = int(gear.get("gearID", 0))
+        if gid:
+            gear_ids_touched.add(gid)
+
+    if gear_ids_touched:
+        by_id = {int(g.get("gearID", 0)): g for g in inv if isinstance(g, dict)}
+        for eq_item in eq:
+            if not isinstance(eq_item, dict):
+                continue
+            gid = int(eq_item.get("gearID", 0))
+            if gid in gear_ids_touched:
+                if gid in by_id:
+                    by_id[gid]["colors"] = list(eq_item.get("colors", [0, 0]))
+                else:
+                    inv.append(eq_item.copy())
+
+    save_characters(session.user_id, session.char_list)
+    send_dye_sync_packet_to_level(session, entity_id)
+
+
+def build_dye_sync_payload(char: dict, entity_id: int) -> bytes:
+    bb = BitBuffer(debug=False)
+    bb.write_method_4(entity_id)
+
+    eq = char.get("equippedGears", []) or []
+
+    for slot in range(1, EntType.MAX_SLOTS):
+        eq_index = slot - 1
+        gear = eq[eq_index] if 0 <= eq_index < len(eq) else None
+
+        if isinstance(gear, dict) and "colors" in gear:
+            d1, d2 = (gear.get("colors") or [0, 0])[:2]
+            bb.write_method_6(1, 1)
+            bb.write_method_6(int(d1), DyeType.BITS)
+            bb.write_method_6(int(d2), DyeType.BITS)
+        else:
+            bb.write_method_6(0, 1)
+
+    shirt_color = char.get("shirtColor")
+    if shirt_color is not None:
+        bb.write_method_6(1, 1)
+        bb.write_method_6(int(shirt_color), EntType.CHAR_COLOR_BITSTOSEND)
+    else:
+        bb.write_method_6(0, 1)
+
+
+    pant_color = char.get("pantColor")
+    if pant_color is not None:
+        bb.write_method_6(1, 1)
+        bb.write_method_6(int(pant_color), EntType.CHAR_COLOR_BITSTOSEND)
+    else:
+        bb.write_method_6(0, 1)
+
+    return bb.to_bytes()
+
+
+def send_dye_sync_packet(session, payload: bytes) -> None:
+    if not session or not session.conn:
+        return
+    pkt = struct.pack(">HH", 0x111, len(payload)) + payload
+    try:
+        session.conn.sendall(pkt)
+    except OSError:
+        pass
+
+
+def send_dye_sync_packet_to_level(session, entity_id: int) -> None:
+    char = session.current_char_dict
+    if not char:
+        return
+
+    payload = build_dye_sync_payload(char, entity_id)
+
+    for other in GS.all_sessions:
+        if other.player_spawned and other.current_level == session.current_level:
+            send_dye_sync_packet(other, payload)
