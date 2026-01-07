@@ -202,30 +202,47 @@
 </div>
 
 <script>
+    const BITBUFFER_METHODS = {{ method_suggestions | tojson }};
+
     function addRow(method = "", value = "", hint = "") {
-    const row = document.createElement("div");
-    row.className = "buffer-row";
+        const row = document.createElement("div");
+        row.className = "buffer-row";
 
-    row.innerHTML = `
-        <input placeholder="write_method_xxx" value="${method}">
-        <input placeholder="values" value="${value}">
-        <input placeholder="hint (optional)" value="${hint}" title="${hint}">
-        <button onclick="this.parentElement.remove()">✖</button>
-    `;
+        const options = BITBUFFER_METHODS.map(m =>
+            `<option value="${m}" ${m === method ? "selected" : ""}>${m}</option>`
+        ).join("");
 
-    document.getElementById("bufferRows").appendChild(row);
+        row.innerHTML = `
+            <select class="bb-method">
+                <option value="">-- select writer --</option>
+                ${options}
+            </select>
+            <input class="bb-value" placeholder="values" value="${value}">
+            <input class="bb-hint" placeholder="hint (optional)" value="${hint}" title="${hint}">
+            <button onclick="this.parentElement.remove()">✖</button>
+        `;
+
+        document.getElementById("bufferRows").appendChild(row);
+
+        if (method && !BITBUFFER_METHODS.includes(method)) {
+            const sel = row.querySelector(".bb-method");
+            const opt = document.createElement("option");
+            opt.value = method;
+            opt.textContent = method + " (custom)";
+            opt.selected = true;
+            sel.insertBefore(opt, sel.firstChild);
+        }
     }
 
 
     function collectBuffers() {
-    return [...document.querySelectorAll(".buffer-row")].map(r => {
-        const inputs = r.querySelectorAll("input");
-        return {
-            method: inputs[0].value,
-            value: inputs[1].value,
-            hint: inputs[2].value || undefined
-        };
-    }).filter(b => b.method && b.value);
+        return [...document.querySelectorAll(".buffer-row")]
+            .map(r => ({
+                method: r.querySelector(".bb-method")?.value,
+                value:  r.querySelector(".bb-value")?.value,
+                hint:   r.querySelector(".bb-hint")?.value || undefined
+            }))
+            .filter(b => b.method && b.value !== undefined && b.value !== "");
     }
 
 
