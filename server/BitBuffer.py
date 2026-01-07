@@ -94,7 +94,7 @@ class BitBuffer:
         self.write_method_11(prefix, 4)
         self.write_method_11(val, bitlen)
 
-    def write_signed_method_45(self, val: int):
+    def write_method_45(self, val: int):
         if val < 0:
             self.write_method_11(1, 1)
             self.write_method_4(-val)

@@ -47,9 +47,9 @@ def broadcast_npc_move(npc, level_name, delta_x, delta_y, delta_vx):
 
     bb = BitBuffer()
     bb.write_method_4(npc["id"])
-    bb.write_signed_method_45(int(delta_x))
-    bb.write_signed_method_45(int(delta_y))
-    bb.write_signed_method_45(int(delta_vx))
+    bb.write_method_45(int(delta_x))
+    bb.write_method_45(int(delta_y))
+    bb.write_method_45(int(delta_vx))
     bb.write_method_6(0, 2)
     bb.write_method_15(npc.get("b_left", False))
     bb.write_method_15(npc.get("b_running", False))

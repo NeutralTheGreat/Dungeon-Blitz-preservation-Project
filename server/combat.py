@@ -89,7 +89,7 @@ def apply_and_broadcast_hp_delta(
 
     bb = BitBuffer()
     bb.write_method_4(ent_id)
-    bb.write_signed_method_45(delta)
+    bb.write_method_45(delta)
 
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x3A, len(payload)) + payload
@@ -164,7 +164,7 @@ def handle_respawn_broadcast(session, data):
 
     bb = BitBuffer()
     bb.write_method_4(ent_id)
-    bb.write_signed_method_45(heal_amount)
+    bb.write_method_45(heal_amount)
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x82, len(payload)) + payload
 

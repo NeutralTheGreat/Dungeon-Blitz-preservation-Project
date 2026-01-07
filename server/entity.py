@@ -139,9 +139,9 @@ def Send_Entity_Data(entity: Dict[str, Any]) -> bytes:
     else:
         bb.write_method_6(0, 1)
 
-    bb.write_signed_method_45(int(entity['x']))  # x
-    bb.write_signed_method_45(int(entity['y']))  # y
-    bb.write_signed_method_45(int(entity.get('v', 0)))  # Velocity
+    bb.write_method_45(int(entity['x']))  # x
+    bb.write_method_45(int(entity['y']))  # y
+    bb.write_method_45(int(entity.get('v', 0)))  # Velocity
 
     bb.write_method_6(entity.get('team', 0), Entity.TEAM_BITS)
 
@@ -255,7 +255,7 @@ def Send_Entity_Data(entity: Dict[str, Any]) -> bytes:
 
     # updates the entity's Health if that specific entity has lost any amount of health
     value = int(round(entity.get("health_delta", 0)))
-    bb.write_signed_method_45(value)
+    bb.write_method_45(value)
 
     # Updates the entities buffs if he has any
     buffs = entity.get("buffs", [])

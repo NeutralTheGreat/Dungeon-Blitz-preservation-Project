@@ -126,8 +126,8 @@ def build_loot_drop_packet(entity_id: int, x: int, y: int,
     bb.write_method_4(entity_id)
 
     # 2) X,Y (signed)
-    bb.write_signed_method_45(x)
-    bb.write_signed_method_45(y)
+    bb.write_method_45(x)
+    bb.write_method_45(y)
 
     # 3) no-offset flag = 0
     bb.write_method_11(1, 1)

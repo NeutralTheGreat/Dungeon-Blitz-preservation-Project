@@ -99,8 +99,8 @@ def Player_Data_Packet(char: dict,
     # ──────────────(Position‐presence)──────────────
     if new_has_coord and target_level and new_x is not None and new_y is not None:
         buf.write_method_11(1, 1)
-        buf.write_signed_method_45(new_x)
-        buf.write_signed_method_45(new_y)
+        buf.write_method_45(new_x)
+        buf.write_method_45(new_y)
     else:
         buf.write_method_11(0, 1)
 
@@ -684,8 +684,8 @@ def build_enter_world_packet(
     # 11) spawn-point flag (_loc18_) + coords (_loc20_, _loc21_)
     buf.write_method_11(1 if new_has_coord else 0, 1)
     if new_has_coord:
-        buf.write_signed_method_45(new_x)
-        buf.write_signed_method_45(new_y)
+        buf.write_method_45(new_x)
+        buf.write_method_45(new_y)
 
     # --- SPECIAL CASE: only send building data when player loads/visits "CraftTown" ---
     # determine if we are entering CraftTown
