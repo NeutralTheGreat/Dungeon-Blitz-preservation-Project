@@ -4,6 +4,7 @@
     <!-- <DEVFLAG_MASTER_CLIENT /> -->
     <!-- <DEVFLAG_STANDALONE_CLIENT /> -->
     <!-- <DEVFLAG_SERVERLOCAL /> -->
+    <!-- <DEVFLAG_ADDXMLDEVSETTINGS /> -->
 
 
     <!-- Debug visuals and tools -->
