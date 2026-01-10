@@ -8,6 +8,31 @@ from BitBuffer import BitBuffer
 from globals import build_start_skit_packet, GS
 from missions import get_mission_extra
 
+#TODO...
+#these names may be wrong
+def handle_set_level_complete(session, data):
+    br = BitReader(data[4:])
+
+    pkt_completion_percent = br.read_method_9()
+    pkt_bonus_score_total  = br.read_method_9()
+    pkt_gold_reward        = br.read_method_9()
+    pkt_material_reward    = br.read_method_9()
+    pkt_gear_count         = br.read_method_9()
+    pkt_remaining_kills    = br.read_method_9()
+    pkt_required_kills     = br.read_method_9()
+    pkt_level_width_score  = br.read_method_9()
+    """
+    print(
+        f"  completion_percent = {pkt_completion_percent}\n"
+        f"  bonus_score_total  = {pkt_bonus_score_total}\n"
+        f"  gold_reward        = {pkt_gold_reward}\n"
+        f"  material_reward    = {pkt_material_reward}\n"
+        f"  gear_count         = {pkt_gear_count}\n"
+        f"  remaining_kills    = {pkt_remaining_kills}\n"
+        f"  required_kills     = {pkt_required_kills}\n"
+        f"  level_width_score  = {pkt_level_width_score}\n"
+    )"""
+
 
 #TODO...
 def handle_pickup_lootdrop(session, data):
