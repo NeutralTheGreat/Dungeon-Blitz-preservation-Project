@@ -195,3 +195,27 @@ def handle_room_unlock(session, data):
             and other.current_level == session.current_level
         ):
             other.conn.sendall(data)
+
+
+def handle_room_boss_info(session, data):
+    br = BitReader(data[4:])
+
+    room_id    = br.read_method_4()
+    boss1_id   = br.read_method_4()
+    boss1_name = br.read_method_26()
+    boss2_id   = br.read_method_4()
+    boss2_name = br.read_method_26()
+
+    #print(
+    #    f"[0xAC] ROOM_BOSS_INFO room={room_id} "
+    #    f"boss1=({boss1_id}, '{boss1_name}') "
+    #    f"boss2=({boss2_id}, '{boss2_name}')"
+    #)
+
+    for other in GS.all_sessions:
+        if (
+            other is not session
+            and other.player_spawned
+            and other.current_level == session.current_level
+        ):
+            other.conn.sendall(data)
