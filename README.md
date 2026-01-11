@@ -68,7 +68,9 @@
 ---
 ## 📜 Legal Notice
 
-This project is for **archival** and **educational purposes only**. All assets remain the property of their original creators. No monetization, redistribution, or alteration of copyrighted material.
+This project is for **archival** and **educational purposes**.
+The maintainers do not endorse monetization, paid access, or commercial exploitation
+of preserved content.
 
 
 ---

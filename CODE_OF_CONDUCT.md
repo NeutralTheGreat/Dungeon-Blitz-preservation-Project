@@ -9,16 +9,16 @@ All community interaction must support this purpose, not undermine it.
 Participants must:
 - Be respectful and constructive  
 - Keep discussions preservation-focused  
-- Use non-commercial intentions only  
+- Respect the preservation focused goals of the project 
 - Avoid misinformation regarding official affiliation  
 
 ## 3. Prohibited Behavior
 The following is strictly forbidden:
-- Monetizing any part of the project (paid servers, ads, donations, etc.)
+- Monetizing project controlled infrastructure, official builds, or community spaces
 - Impersonating the original developers or project maintainers  
 - Posting scams, fake releases, or misleading information  
 - Harassment, threats, hate speech, or abusive behavior  
-- Introducing contributions that violate the non-commercial policy  
+- Introducing contributions that promote monetization of preserved assets or misrepresent the project 
 - Encouraging distribution or use of assets outside preservation purposes  
 
 ## 4. Enforcement
@@ -37,7 +37,7 @@ All reports will be reviewed confidentially.
 Those who violate this code may face:
 - Issue/PR bans  
 - Removal of contributions  
-- Takedown notices for monetized forks  
+- Takedown notices for asset misuse, trademark violations, or impersonation 
 - Permanent exclusion from the community  
 
 This project is a preservation effort — please respect the integrity and spirit of that purpose.
