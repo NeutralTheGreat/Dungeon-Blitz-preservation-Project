@@ -3,66 +3,108 @@
 <head>
   <meta charset="UTF-8">
   <title>Play Dungeon Blitz</title>
-  <!-- SWFObject library -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/swfobject/2.2/swfobject.min.js"></script>
+  <script src="js/swfobject.min.js"></script>
+
   <style>
-    body {
-     margin: 0;
-     background: #000;
-     height: 100vh;
-     width: 100vw;
-     overflow: hidden;
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
     }
-    #flash-container {
-      width: 100vw;
-      height: 100vh;
-       }
+
+    #game-container {
+      width: 100%;
+      height: 100%;
+    }
+
+    #flash-hint {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #aaa;
+      font-family: sans-serif;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    #fallback {
+      display: none;
+      color: #ccc;
+      font-family: sans-serif;
+      text-align: center;
+      padding-top: 20vh;
+    }
+
+    a { color: #6cf; }
   </style>
 </head>
+
 <body>
-  <div id="flash-container">
-    <p>Flash Player required. <a href="https://www.adobe.com/support/flashplayer/debug_downloads.html">Get Flash Player</a>.</p>
+
+  <div id="game-container"></div>
+
+  <div id="flash-hint">
+    <div>
+      <p>Waiting for Adobe Flash Player…</p>
+      <p style="font-size:0.9em; opacity:0.7">
+        Click “Allow” in your browser’s address bar
+      </p>
+    </div>
   </div>
 
-    <script>
-    // Embed via SWFObject
-    var swfUrl = "p/cbv/DungeonBlitz.swf?fv=cbq&gv=cbv";
-    var flashvars = { fv: "cbq", gv: "cbv" };
-    var params = { allowScriptAccess: "always", allowFullScreen: "true" };
-    var attrs = { id: "DungeonBlitz", name: "DungeonBlitz" };
+  <!-- Hard fallback if Flash is missing -->
+  <div id="fallback">
+    <h2>Adobe Flash Player Required</h2>
+    <p>
+      Enable Flash for this site when prompted,<br>
+      or use the Flash Projector.
+    </p>
+    <p>
+      • <a href="https://www.adobe.com/support/flashplayer/debug_downloads.html">
+        Flash Projector (recommended)
+      </a>
+    </p>
+  </div>
 
+  <script>
+    const swfUrl = "p/cbv/DungeonBlitz.swf?fv=cbq&gv=cbv";
+
+    function showFallback() {
+      document.getElementById("flash-hint").style.display = "none";
+      document.getElementById("fallback").style.display = "block";
+    }
+
+    function hideHint() {
+      const hint = document.getElementById("flash-hint");
+      if (hint) hint.style.display = "none";
+    }
+
+    // Attempt native Flash immediately
     swfobject.embedSWF(
-    swfUrl,
-    "flash-container",
-    "100%", "100%",
-    "10.0.0",
-    null,
-    flashvars,
-    params,
-    attrs
+      swfUrl,
+      "game-container",
+      "100%",
+      "100%",
+      "10.0.0",
+      null,
+      { fv: "cbq", gv: "cbv" },
+      { allowScriptAccess: "always", allowFullScreen: "true" },
+      { id: "DungeonBlitz", name: "DungeonBlitz" },
+      function (e) {
+        if (!e.success) {
+          // Flash not installed or unavailable
+          showFallback();
+        }
+      }
     );
 
-    // Fallback: if no plugin, inject an <object> tag directly
-    window.addEventListener('load', function() {
-      if (!swfobject.hasFlashPlayerVersion('10.0.0')) {
-        var obj = document.createElement('object');
-        obj.width = '1500'; obj.height = '950';
-        obj.data = swfUrl;
-        obj.type = 'application/x-shockwave-flash';
-        obj.id = 'DungeonBlitz';
-        obj.name = 'DungeonBlitz';
-        var fvParam = document.createElement('param');
-        fvParam.name = 'flashvars'; fvParam.value = 'fv=cbq&gv=cbv';
-        var asParam = document.createElement('param'); asParam.name = 'allowScriptAccess'; asParam.value = 'always';
-        var fsParam = document.createElement('param'); fsParam.name = 'allowFullScreen'; fsParam.value = 'true';
-        obj.appendChild(fvParam);
-        obj.appendChild(asParam);
-        obj.appendChild(fsParam);
-        var container = document.getElementById('flash-container');
-        container.innerHTML = '';
-        container.appendChild(obj);
-      }
-    });
+    // Give Flash time to initialize after permission
+    setTimeout(hideHint, 2500);
   </script>
 </body>
 </html>
