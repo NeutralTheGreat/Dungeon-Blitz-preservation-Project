@@ -255,6 +255,14 @@ def send_gear_reward(session, gear_id, tier=0, has_mods=False):
     session.conn.sendall(pkt)
 
 
+def send_xp_reward(session, xp_amount: int):
+    bb = BitBuffer()
+    bb.write_method_4(int(xp_amount))
+    payload = bb.to_bytes()
+    packet = struct.pack(">HH", 0x2B, len(payload)) + payload
+    session.conn.sendall(packet)
+
+
 def build_hatchery_packet(eggs: list[int], reset_time: int):
     bb = BitBuffer()
 
