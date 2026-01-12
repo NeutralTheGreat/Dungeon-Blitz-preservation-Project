@@ -445,5 +445,15 @@
                 "hint": ""
             }
         ]
+    },
+    "Send XP to Player ": {
+        "packet_type": "0x2B",
+        "description": "",
+        "buffers": [
+            {
+                "method": "write_method_4",
+                "value": "5000"
+            }
+        ]
     }
 }
