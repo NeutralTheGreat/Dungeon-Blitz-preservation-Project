@@ -5,7 +5,7 @@ import time
 from bitreader import BitReader
 from constants import GearType, class_3, PowerType
 from BitBuffer import BitBuffer
-from globals import build_start_skit_packet, GS
+from globals import build_start_skit_packet
 from missions import get_mission_extra
 
 #TODO...
@@ -149,41 +149,6 @@ def handle_talk_to_npc(session, data):
         f"dialogue_id={dialogue_id}, mission_id={mission_id}"
     )
 
-REWARD_TYPES = ['gear', 'item', 'gold', 'chest', 'xp', 'potion']
-
-def build_loot_drop_packet(entity_id: int, x: int, y: int,
-                           reward_type: str, value1: int=0, value2: int=0) -> bytes:
-    """
-    Packet 0x32: one bit per reward in order:
-      [gear, item, gold, chest, xp, potion]
-    """
-    bb = BitBuffer(debug=True)
-
-    # 1) Entity ID
-    bb.write_method_4(entity_id)
-
-    # 2) X,Y (signed)
-    bb.write_method_45(x)
-    bb.write_method_45(y)
-
-    # 3) no-offset flag = 0
-    bb.write_method_11(1, 1)
-
-    # 4) six-type flags + payload
-    for rt in REWARD_TYPES:
-        bit = 1 if rt == reward_type else 0
-        bb.write_method_11(bit, 1)
-        if bit:
-            if rt == 'gear':
-                bb.write_method_6(value1, GearType.GEARTYPE_BITSTOSEND)
-                bb.write_method_6(value2, GearType.GEARTYPE_BITSTOSEND)
-            else:
-                bb.write_method_4(value1)
-            break
-
-    payload = bb.to_bytes()
-    header  = struct.pack('>HH', 0x32, len(payload))
-    return header + payload
 
 def handle_lockbox_reward(session, data):
     _=data[4:]
@@ -286,58 +251,113 @@ def handle_linkupdater(session, data):
     #pprint.pprint(props, indent=4)
 
 #TODO... this is just for testing
+def generate_loot_id():
+    return random.randint(1_000_000, 9_999_999)
+
 def handle_grant_reward(session, data):
-    payload = data[4:]
-    br = BitReader(payload, debug=True)
+    return
 
-    grantor_id    = br.read_method_9()
-    target_id     = br.read_method_9()
+    br = BitReader(data[4:])
 
-    flag_showXP   = bool(br.read_method_15())
-    xp_rate       = br.read_float()
+    receiver_id = br.read_method_9()
+    source_id   = br.read_method_9()
 
-    flag_showGold = bool(br.read_method_15())
-    gold_rate     = br.read_float()
+    drop_item   = br.read_method_15()
+    item_mult   = br.read_method_309()
 
-    flag_showHeal = bool(br.read_method_15())
-    flag_showMana = bool(br.read_method_15())
+    drop_gear   = br.read_method_15()
+    gear_mult   = br.read_method_309()
 
-    code_xpType   = br.read_method_9()
-    code_goldType = br.read_method_9()
-    code_manaType = br.read_method_9()
-    code_healType = br.read_method_9()
+    drop_material = br.read_method_15()
+    drop_trove    = br.read_method_15()
 
-    # **NOW** read the drop coordinates:
-    drop_x = br.read_method_24()   # signed 24-bit
-    drop_y = br.read_method_24()   # signed 24-bit
+    exp     = br.read_method_9()
+    pet_exp = br.read_method_9()
+    hp_gain = br.read_method_9()
+    gold    = br.read_method_9()
 
-    has_extra     = bool(br.read_method_15())
-    extra_id      = br.read_method_9() if has_extra else None
+    world_x = br.read_method_24()
+    world_y = br.read_method_24()
 
-    # now build loot_drops using the true drop_x, drop_y:
-    loot_drops = []
-    if flag_showXP:
-        loot_drops.append(('xp', code_xpType, int(xp_rate)))
-    if flag_showGold:
-        loot_drops.append(('gold', code_goldType, int(gold_rate)))
-    if flag_showHeal:
-        loot_drops.append(('healing', code_healType, 0))
-    if flag_showMana:
-        loot_drops.append(('mana', code_manaType, 0))
-    if extra_id:
-        # the client expects two fixed‐width values for gear:
-        loot_drops.append(('gear', extra_id, extra_id))
+    killing_blow = br.read_method_15()
+    combo = br.read_method_9() if killing_blow else 0
+    """
+    print("\n========== PKTTYPE_GRANT_REWARD (0x2A) ==========")
+    print(f" Receiver EntityID : {receiver_id}")
+    print(f" Source EntityID   : {source_id}")
+    print("-------------------------------------------------")
+    print(f" Drop Item Flag    : {drop_item}")
+    print(f" Item Multiplier   : {item_mult}")
+    print(f" Drop Gear Flag    : {drop_gear}")
+    print(f" Gear Multiplier   : {gear_mult}")
+    print(f" Drop Material     : {drop_material}")
+    print(f" Drop Trove        : {drop_trove}")
+    print("-------------------------------------------------")
+    print(f" EXP Granted       : {exp}")
+    print(f" Pet EXP Granted   : {pet_exp}")
+    print(f" HP Gain           : {hp_gain}")
+    print(f" Gold Granted      : {gold}")
+    print("-------------------------------------------------")
+    print(f" World X           : {world_x}")
+    print(f" World Y           : {world_y}")
+    print("-------------------------------------------------")
+    print(f" Killing Blow      : {killing_blow}")
+    if killing_blow:
+        print(f" Killer Combo ID   : {combo}")
+    print("-------------------------------------------------")
+    """
+    PROCESSED_REWARD_SOURCES = set()
+    reward_key = (session.current_level, source_id)
+    if reward_key in PROCESSED_REWARD_SOURCES:
+        return
+    PROCESSED_REWARD_SOURCES.add(reward_key)
 
-    # broadcast one 0x32 per drop:
-    for rtype, v1, v2 in loot_drops:
-        pkt = build_loot_drop_packet(
-            entity_id=target_id,
-            x=drop_x,
-            y=drop_y,
-            reward_type=rtype,
-            value1=v1,
-            value2=v2
+    drop_loot = True
+
+    if drop_loot:
+        pkt = build_lootdrop(
+            loot_id=generate_loot_id(),
+            x=world_x,
+            y=world_y,
         )
-        for other in GS.all_sessions:
-            if other.player_spawned and other.current_level == session.current_level:
-                other.conn.sendall(pkt)
+        session.conn.sendall(pkt)
+
+def build_lootdrop(
+        loot_id: int,
+        x: int,
+        y: int,
+):
+    bb = BitBuffer()
+
+    bb.write_method_4(loot_id)
+    bb.write_method_45(x)
+    bb.write_method_45(y)
+
+    # only one boolean must be True at a time if all False then the client will drop dyes
+
+    # Gear branch
+    bb.write_method_15(False)
+    #bb.write_method_6(gear_id, GearType.GEARTYPE_BITSTOSEND)
+    #bb.write_method_6(tier, GearType.GEARTYPE_BITSTOSEND)  # 3 tears in total 0/2
+
+    # material Branch
+    bb.write_method_15(False)
+    #bb.write_method_4(Mat_ID)  # Materials ID 126 in Total
+
+    # Gold Branch
+    bb.write_method_15(False)
+    #bb.write_method_4(Gold_amount)
+
+    # Health Branch
+    bb.write_method_15(False)
+    #bb.write_method_4(health_amount)
+
+    # Chest Trove Branch
+    bb.write_method_15(False)
+    #bb.write_method_4(1)  # only one Trove is possible since only one exists ID 1
+
+    # Fallback branch: dye ID
+    bb.write_method_4(1)  # 250 Dye IDs in total
+
+    body = bb.to_bytes()
+    return struct.pack(">HH", 0x32, len(body)) + body
