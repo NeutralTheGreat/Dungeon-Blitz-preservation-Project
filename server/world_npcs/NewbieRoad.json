@@ -1866,5 +1866,129 @@
     "facing_left": false,
     "health_delta": 0,
     "buffs": []
+  },
+  {
+    "is_player": true,
+    "id": 150,
+    "name": "Neutral",
+    "class": "Paladin",
+    "gender": "Male",
+    "headSet": "Long",
+    "hairSet": "Do01",
+    "mouthSet": "M01",
+    "faceSet": "F01",
+    "hairColor": 9841,
+    "skinColor": 16764057,
+    "shirtColor": 13489881,
+    "pantColor": 13489881,
+    "equippedGears": [
+      {
+        "gearID": 1000,
+        "tier": 1,
+        "runes": [
+          70,
+          60,
+          90
+        ],
+        "colors": [
+          29,
+          18
+        ]
+      },
+      {
+        "gearID": 733,
+        "tier": 1,
+        "runes": [
+          70,
+          60,
+          90
+        ],
+        "colors": [
+          29,
+          18
+        ]
+      },
+      {
+        "gearID": 995,
+        "tier": 1,
+        "runes": [
+          70,
+          60,
+          90
+        ],
+        "colors": [
+          29,
+          18
+        ]
+      },
+      {
+        "gearID": 916,
+        "tier": 1,
+        "runes": [
+          70,
+          59,
+          90
+        ],
+        "colors": [
+          29,
+          18
+        ]
+      },
+      {
+        "gearID": 988,
+        "tier": 1,
+        "runes": [
+          70,
+          59,
+          90
+        ],
+        "colors": [
+          29,
+          18
+        ]
+      },
+      {
+        "gearID": 812,
+        "tier": 1,
+        "runes": [
+          70,
+          59,
+          90
+        ],
+        "colors": [
+          29,
+          18
+        ]
+      }
+    ],
+    "x": 3060,
+    "y": 597,
+    "v": 0,
+    "team": 1,
+    "facing_left": true,
+    "level": 50,
+    "idle_reset": true,
+    "spawn_fx": false,
+    "PetTypeID": 1,
+    "PetLevel": 1,
+    "MountID": 1,
+    "Emote_ID": 1,
+    "abilities": [
+      {
+        "abilityID": 5,
+        "rank": 3
+      },
+      {
+        "abilityID": 10,
+        "rank": 2
+      },
+      {
+        "abilityID": 15,
+        "rank": 1
+      }
+    ],
+    "power_id": 0,
+    "entState": 0,
+    "Talent_id": 10
   }
 ]
