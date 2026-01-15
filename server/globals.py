@@ -7,6 +7,7 @@ from constants import class_3, class_1, class_64, class_111, class_66, GearType,
 
 HOST = "127.0.0.1"
 PORTS = [8080]# Developer mode Port : 7498
+PORT_HTTP = 8081
 
 class GlobalState:
     def __init__(self):
