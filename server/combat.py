@@ -84,8 +84,6 @@ def apply_and_broadcast_hp_delta(
     all_sessions,
     source_name: str,
 ):
-    ent = source_session.entities.get(ent_id)
-    ent["hp"] = max(0, ent.get("hp", 0) + delta)
 
     bb = BitBuffer()
     bb.write_method_4(ent_id)
