@@ -5,18 +5,6 @@ PACKET_HEADER_SIZE = 4
 CONST_529 = [5,2,3,5,5,3,2,3,2,5,2,3,5,5,3,2,3,2,5,2,3,5,5,3,2,3,2]
 SLOT_BIT_WIDTHS = []
 
-FRAMEBITS_TO_CLASSKEY = {
-        533: "executioner",
-        545: "shadowwalker",
-        437: "soulthief",
-        442: "sentinel",
-        415: "justicar",
-        472: "templar",
-        479: "frostwarden",
-        491: "flameseer",
-        550: "necromancer",
-    }
-
 def index_to_node_id(index: int) -> int:
     """
     Reverse mapping of client method_191:
@@ -28,18 +16,6 @@ def index_to_node_id(index: int) -> int:
         return index + 2
     else:  # indices 18-26 → NodeID 20-27
         return index + 3
-
-def method_233(frame_bits: int) -> str:
-    return FRAMEBITS_TO_CLASSKEY.get(frame_bits, "")
-
-def client_index_to_node_id(i: int) -> int:
-    """Emulates  method_191"""
-    if i < 9:
-        return i + 1
-    elif i < 18:
-        return i + 2
-    else:
-        return i + 3
 
 MASTERCLASS_TO_BUILDING = {
     # Rogue
@@ -56,6 +32,12 @@ MASTERCLASS_TO_BUILDING = {
     7: 6,   # FrostwardenTower
     8: 7,   # FlameseerTower
     9: 8    # NecromancerTower
+}
+
+CLASS_NAME_TO_ID = {
+    "Paladin": 0,
+    "Rogue":   1,
+    "Mage":    2,
 }
 
 for x in CONST_529:
@@ -75,6 +57,24 @@ def method_277(idx: int) -> int:
     if x <= 4: w = 2
     if x <= 5: w = 3
     return w
+
+BUILDING_ID_TO_STATS_INDEX = {
+    2: 0,    # Magic Forge
+    12: 1,   # Keep
+    3: 2, 4: 3, 5: 4,  # Paladin Talents
+    6: 2, 7: 3, 8: 4,  # Mage Talents
+    9: 2, 10: 3, 11: 4,  # Rogue Talents
+    1: 5,    # Tome
+    13: 6,   # Hatcher
+}
+
+NEWS_EVENTS = {
+    1: ["a_NewsGoldIcon",      "Double Gold Event",     "Double Gold Event",       "http://www.dungeonblitz.com/",1786841238],
+    2: ["a_NewsGearIcon",      "Double Gear Event",     "Double Gear Event",       "http://www.dungeonblitz.com/",1786841238],
+    3: ["a_NewsMatsIcon",      "Double Material Event", "Double Material Event",   "http://www.dungeonblitz.com/",1786841238],
+    4: ["a_NewsXPIcon",        "Double XP Event",       "Double XP Event",         "http://www.dungeonblitz.com/",1786841238],
+    5: ["a_NewsPetXPIcon",     "Double Pet XP Event",   "Double Pet XP Event",     "http://www.dungeonblitz.com/",1786841238],
+}
 
 class Bossfight:
     const_1145 = 0
@@ -105,15 +105,6 @@ class class_119:
     const_679 = 600
     const_490 = 810
     const_1418 = 560
-
-ENTITYSTATE_DEAD   = 2    # 3
-ENTITYSTATE_ALIVE  = 1  # 1
-
-CLASS_NAME_TO_ID = {
-    "Paladin": 0,
-    "Rogue":   1,
-    "Mage":    2,
-}
 
 class class_9:
     const_851 = 2
@@ -317,23 +308,6 @@ class class_66:
                   431, 450, 471, 494, 519, 545]
 
 
-BUILDING_ID_TO_STATS_INDEX = {
-    2: 0,    # Magic Forge
-    12: 1,   # Keep
-    3: 2, 4: 3, 5: 4,  # Paladin Talents
-    6: 2, 7: 3, 8: 4,  # Mage Talents
-    9: 2, 10: 3, 11: 4,  # Rogue Talents
-    1: 5,    # Tome
-    13: 6,   # Hatcher
-}
-
-NEWS_EVENTS = {
-    1: ["a_NewsGoldIcon",      "Double Gold Event",     "Double Gold Event",       "http://www.dungeonblitz.com/",1786841238],
-    2: ["a_NewsGearIcon",      "Double Gear Event",     "Double Gear Event",       "http://www.dungeonblitz.com/",1786841238],
-    3: ["a_NewsMatsIcon",      "Double Material Event", "Double Material Event",   "http://www.dungeonblitz.com/",1786841238],
-    4: ["a_NewsXPIcon",        "Double XP Event",       "Double XP Event",         "http://www.dungeonblitz.com/",1786841238],
-    5: ["a_NewsPetXPIcon",     "Double Pet XP Event",   "Double Pet XP Event",     "http://www.dungeonblitz.com/",1786841238],
-}
                #Loaders
 ################################################################
 
