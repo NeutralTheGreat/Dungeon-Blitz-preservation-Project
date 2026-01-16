@@ -221,35 +221,32 @@ def Send_Entity_Data(entity: Dict[str, Any]) -> bytes:
         if bb.debug:
             bb.debug_log.append(f"level={level}")
 
-        class_id = entity.get("Talent_id", Game.const_526)
+        class_id = entity.get("MasterClass", Game.const_526)
         bb.write_method_6(class_id, Game.const_209)
-        if bb.debug:
-            bb.debug_log.append(f"Talent_id={class_id}")
 
-        # we are not sending any Talent Data
-        bb.write_method_6( 0, 1)
-        #TODO...
-        # this will crash the game not sure why the game seems to read the bitstream properly
-        # after this is fixed the bitstream should be fully in sync with the client
-        """ 
-        # 5f) Talent Nodes / Upgrades
-        talents = entity.get("talents", [])
-        has_talents = any(t for t in talents if t)  # at least one slot filled
-        bb.write_method_6(1 if has_talents else 0, 1)
+        # Talent data is ONLY allowed if a MasterClass has been equipped
+        has_talent_tree = (
+                class_id != Game.const_526 and
+                any(
+                    t and t.get("nodeID", 0) > 0 and t.get("points", 0) > 0
+                    for t in entity.get("talents", [])
+                )
+        )
 
-        if has_talents:
-            for slot in range(class_118.NUM_TALENT_SLOTS):  # always 27 slots
-                t = talents[slot] if slot < len(talents) and talents[slot] else None
+        bb.write_method_6(1 if has_talent_tree else 0, 1)
+
+        if has_talent_tree:
+            for slot in range(class_118.NUM_TALENT_SLOTS):  # ALWAYS 27
+                t = entity["talents"][slot] if slot < len(entity["talents"]) else None
+
                 if t and t.get("nodeID", 0) > 0 and t.get("points", 0) > 0:
-                    node_id = t["nodeID"]
-                    points = t["points"]
-                    bb.write_method_6(1, 1)  # slot filled
-                    bb.write_method_6(node_id, class_118.const_127)  # 6 bits for nodeID
-                    bb.write_method_6(points - 1, method_277(slot))  # N bits for points
-
+                    bb.write_method_6(1, 1)
+                    bb.write_method_6(t["nodeID"], class_118.const_127)
+                    bb.write_method_6(t["points"] - 1, method_277(slot))
                 else:
-                    bb.write_method_6(0, 1)  # empty slot
-        """
+                    bb.write_method_6(0, 1)
+
+
     else:
         bb.write_method_6(0, 1)
 
@@ -307,12 +304,44 @@ def build_entity_dict(eid, char, props):
             "equippedGears": char.get("equippedGears", []),
             "abilities": char.get("learnedAbilities", []),
             "level": char.get("level", 1),
-            "Talent_id": char.get("MasterClass", 0),
+            "MasterClass": char.get("MasterClass", 0),
+            "talents": build_talent_slots(char),
             "equippedMount": char.get("equippedMount", 0)
         })
 
     return ent_dict
 
+def build_talent_slots(char: dict) -> list:
+    slots = [None] * class_118.NUM_TALENT_SLOTS
+
+    master_class = char.get("MasterClass", 0)
+    if master_class == 0:
+        return slots
+
+    tree = char.get("TalentTree", {})
+    class_tree = tree.get(str(master_class))
+    if not class_tree:
+        return slots
+
+    for node in class_tree.get("nodes", []):
+        if not node.get("filled"):
+            continue
+
+        node_id = node.get("nodeID", 0)
+        points  = node.get("points", 0)
+        if node_id <= 0 or points <= 0:
+            continue
+
+        slot = node_id - 1
+        if slot < 0 or slot >= class_118.NUM_TALENT_SLOTS:
+            continue
+
+        slots[slot] = {
+            "nodeID": node_id,
+            "points": points
+        }
+
+    return slots
 
 def send_existing_entities_to_joiner(joiner):
     """
