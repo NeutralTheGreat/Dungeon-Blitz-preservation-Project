@@ -3,7 +3,7 @@ import random
 import time
 
 from bitreader import BitReader
-from constants import GearType, class_3, PowerType
+from constants import GearType, class_3, PowerType, Game
 from BitBuffer import BitBuffer
 from globals import build_start_skit_packet
 from missions import get_mission_extra
@@ -32,6 +32,24 @@ def handle_set_level_complete(session, data):
         f"  required_kills     = {pkt_required_kills}\n"
         f"  level_width_score  = {pkt_level_width_score}\n"
     )"""
+
+
+def handle_send_combat_stats(session, data):
+    br = BitReader(data[4:])
+
+    melee_damage = br.read_method_9()
+    magic_damage = br.read_method_9()
+    max_hp       = br.read_method_9()
+
+    stat_scale   = br.read_method_20(Game.const_794)
+    stat_rev     = br.read_method_9()
+    print(
+        f"[COMBAT_STATS] melee={melee_damage} "
+        f"magic={magic_damage} "
+        f"maxHP={max_hp} "
+        f"scale={stat_scale} "
+        f"rev={stat_rev}"
+    )
 
 
 #TODO...

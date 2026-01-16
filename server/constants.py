@@ -186,6 +186,7 @@ class LinkUpdater:
     VELOCITY_INFLATE = 10000
 
 class Game :
+    const_794 = 4
     const_1057 = 6
     const_813 = 2
     const_790 = [1, 1.7, 2.4, 3.1]
