@@ -108,19 +108,25 @@ def handle_entity_destroy(session, data):
     br = BitReader(data[4:])
     entity_id = br.read_method_9()
 
-    # Remove the entity from this session's view
+    level = session.current_level
+    # remove from this session
     session.entities.pop(entity_id, None)
 
     # If this was the client’s own entity, clear reference
     if session.clientEntID == entity_id:
         session.clientEntID = None
 
-    # Broadcast unchanged packet to other players in same level
+    # remove from authoritative NPC state
+    level_npcs = GS.level_npcs.get(level)
+    if level_npcs and entity_id in level_npcs:
+        del level_npcs[entity_id]
+        #print(f"[DESTROY] NPC {entity_id} removed from level {level}")
+
     for other in GS.all_sessions:
         if (
             other is not session
             and other.player_spawned
-            and other.current_level == session.current_level
+            and other.current_level == level
         ):
             other.conn.sendall(data)
 
