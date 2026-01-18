@@ -5,7 +5,7 @@ import struct
 from typing import Dict, Any
 from BitBuffer import BitBuffer
 from bitreader import BitReader
-from constants import Entity, class_7, class_20, class_3, Game, LinkUpdater, EntType, GearType, class_64, class_21
+from constants import Entity, class_7, class_20, class_3, Game, LinkUpdater, EntType, GearType, class_64, class_21, class_118, method_277
 from globals import GS
 
 """
