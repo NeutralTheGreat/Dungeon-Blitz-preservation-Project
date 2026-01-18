@@ -13,6 +13,8 @@ from missions import get_mission_extra
 def handle_set_level_complete(session, data):
     br = BitReader(data[4:])
 
+    send_dummy_level_complete(session)
+
     pkt_completion_percent = br.read_method_9()
     pkt_bonus_score_total  = br.read_method_9()
     pkt_gold_reward        = br.read_method_9()
@@ -32,6 +34,32 @@ def handle_set_level_complete(session, data):
         f"  required_kills     = {pkt_required_kills}\n"
         f"  level_width_score  = {pkt_level_width_score}\n"
     )"""
+
+def send_dummy_level_complete(
+    session,
+    stars=3,
+    result_bar=1,
+    rank=1,
+    kills=50,
+    accuracy=50,
+    deaths=5,
+    treasure=5000,
+    time=6000,
+):
+    bb = BitBuffer()
+
+    bb.write_method_6(stars, 4)
+    bb.write_method_4(result_bar)
+    bb.write_method_4(rank)
+    bb.write_method_4(kills)
+    bb.write_method_4(accuracy)
+    bb.write_method_4(deaths)
+    bb.write_method_4(treasure)
+    bb.write_method_4(time)
+
+    payload = bb.to_bytes()
+    pkt = struct.pack(">HH", 0x87, len(payload)) + payload
+    session.conn.sendall(pkt)
 
 
 def handle_send_combat_stats(session, data):
