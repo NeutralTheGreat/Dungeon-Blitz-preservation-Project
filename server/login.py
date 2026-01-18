@@ -12,7 +12,7 @@ from accounts import get_or_create_user_id, load_accounts, build_popup_packet, i
 from ai_logic import AI_ENABLED, ensure_ai_loop, run_ai_loop
 from bitreader import BitReader
 from constants import EntType, load_class_template
-from entity import Send_Entity_Data, ensure_level_npcs
+from entity import Send_Entity_Data, ensure_level_npcs, normalize_entity_for_send
 from globals import SECRET, _level_add, all_sessions, GS, HOST, PORTS
 from level_config import LEVEL_CONFIG, get_spawn_coordinates
 from socials import get_group_for_session, online_group_members, update_session_group_cache, build_group_update_packet
@@ -299,7 +299,8 @@ def handle_gameserver_login(session, data):
         pass
 
     for npc in npcs.values():
-        payload = Send_Entity_Data(npc)
+        flat_npc = normalize_entity_for_send(npc)
+        payload = Send_Entity_Data(flat_npc)
         session.conn.sendall(
             struct.pack(">HH", 0x0F, len(payload)) + payload
         )

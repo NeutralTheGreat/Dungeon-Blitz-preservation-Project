@@ -187,8 +187,9 @@ def Send_Entity_Data(entity: Dict[str, Any]) -> bytes:
         else:
             bb.write_method_6(0, 1)
 
+    cue = entity.get("cue_data", {})
     for key in ("character_name", "DramaAnim", "SleepAnim"):
-        val = entity.get(key, "")
+        val = cue.get(key, "")
         bb.write_method_6(1 if val else 0, 1)
         if val:
             bb.write_method_13(val)
@@ -428,7 +429,7 @@ def handle_entity_full_update(session, data):
         "ent_name": ent_name,
         "team": team,
         "is_player": is_player,
-        "y_offset": y_offset,
+        "render_depth_offset": y_offset,
         "cue_data": cue_data,
         "summoner_id": summoner_id,
         "power_id": power_id,
@@ -469,7 +470,9 @@ def handle_entity_full_update(session, data):
             "x": int(pos_x),
             "y": int(pos_y),
             "v": int(velocity_x),
+            "render_depth_offset": y_offset,
             "team": int(team),
+            "cue_data": cue_data,
             "summonerId": summoner_id or 0,
             "power_id": power_id or 0,
             "entState": ent_state,
@@ -478,7 +481,9 @@ def handle_entity_full_update(session, data):
             "buffs": [],
         }
 
-        pkt = Send_Entity_Data(ent_dict)
+        register_level_npc(session.current_level, ent_dict)
+        flat_ent = normalize_entity_for_send(ent_dict)
+        pkt = Send_Entity_Data(flat_ent)
         framed = struct.pack(">HH", 0x0F, len(pkt)) + pkt
 
         for other in GS.all_sessions:
@@ -502,7 +507,8 @@ def handle_entity_full_update(session, data):
         )
         if char:
             ent_dict = build_entity_dict(entity_id, char, props)
-            pkt = Send_Entity_Data(ent_dict)
+            flat_ent = normalize_entity_for_send(ent_dict)
+            pkt = Send_Entity_Data(flat_ent)
             framed = struct.pack(">HH", 0x0F, len(pkt)) + pkt
             for other in GS.all_sessions:
                 if (
@@ -513,20 +519,37 @@ def handle_entity_full_update(session, data):
                     other.conn.sendall(framed)
                     #print(f"[JOIN] Broadcasted Send_Entity_Data for {ent_dict['name']} → {other.addr}")
 
-def ensure_level_npcs(level_name):
-    """
-    Ensure NPCs for this level are loaded/spawned once.
-    Returns the dict of NPCs for this level.
-    """
-    if level_name not in GS.level_npcs:
-        try:
-            npcs = load_npc_data_for_level(level_name)
-            npc_map = {}
-            for npc in npcs:
-                npc_map[npc["id"]] = npc
-            GS.level_npcs[level_name] = npc_map
-            #print(f"[LEVEL] Spawned {len(npc_map)} NPCs for {level_name}")
-        except Exception as e:
-            print(f"[LEVEL] Error loading NPCs for {level_name}: {e}")
-            GS.level_npcs[level_name] = {}
+def ensure_level_npcs(level_name: str) -> dict:
+    existing = GS.level_npcs.get(level_name)
+    if existing is not None:
+        return existing
+
+    try:
+        npcs = load_npc_data_for_level(level_name)
+        npc_map = {npc["id"]: npc for npc in npcs}
+        GS.level_npcs[level_name] = npc_map
+        # print(f"[LEVEL] Spawned {len(npc_map)} NPCs for {level_name}")
+    except Exception as e:
+        print(f"[LEVEL] Error loading NPCs for {level_name}: {e}")
+        GS.level_npcs[level_name] = {}
+
     return GS.level_npcs[level_name]
+
+def register_level_npc(level_name: str, npc: dict):
+    level_map = GS.level_npcs.setdefault(level_name, {})
+    level_map[npc["id"]] = npc
+
+def normalize_entity_for_send(entity: dict) -> dict:
+    out = dict(entity)
+
+    cue = entity.get("cue_data", {})
+    if cue:
+        for key in ("character_name", "DramaAnim", "SleepAnim"):
+            if key in cue and cue[key]:
+                out[key] = cue[key]
+
+    out.setdefault("character_name", "")
+    out.setdefault("DramaAnim", "")
+    out.setdefault("SleepAnim", "")
+    return out
+
