@@ -3,10 +3,86 @@ import random
 import time
 
 from bitreader import BitReader
-from constants import GearType, class_3, PowerType, Game
+from constants import GearType, class_3, PowerType, Game, class_119
 from BitBuffer import BitBuffer
 from globals import build_start_skit_packet
 from missions import get_mission_extra
+
+def handle_dungeon_run_report(session, data):
+    br = BitReader(data[4:])
+
+    master_class_id           = br.read_method_20(Game.const_209)
+    player_level              = br.read_method_9()
+    session_play_time         = br.read_method_9()
+    time_in_combat            = br.read_method_9()
+    total_damage_dealt_player = br.read_method_24()
+    total_damage_dealt_pets   = br.read_method_24()
+    expected_damage_scale     = br.read_method_24()
+    kills                     = br.read_method_24()
+    healing_dealt             = br.read_method_24()
+    damage_received           = br.read_method_24()
+    damage_resisted           = br.read_method_24()
+    deaths                    = br.read_method_24()
+    healing_received          = br.read_method_24()
+    primary_damage_stat       = br.read_method_24()
+    magic_damage              = br.read_method_24()
+    armor_class               = br.read_method_24()
+    attack_speed_scaled       = br.read_method_24()
+    movement_speed_scaled     = br.read_method_24()
+    max_hp                    = br.read_method_24()
+    average_group_size_scaled = br.read_method_24()
+    session_flags_bitfield    = br.read_method_20(class_119.const_228)
+    time_rank                 = br.read_method_9()
+    kills_score               = br.read_method_9()
+    accuracy_score            = br.read_method_9()
+    deaths_score              = br.read_method_9()
+    treasure_score            = br.read_method_9()
+    time_score                = br.read_method_9()
+    entries = []
+    while br.read_method_15():
+        entry = read_class_166(br)
+        entries.append(entry)
+
+    log_block = {
+    "master_class_id": master_class_id,
+    "player_level"   : player_level,
+    "session_play_time": session_play_time,
+    "time_in_combat" : time_in_combat,
+    "total_damage_dealt_player": total_damage_dealt_player,
+    "total_damage_dealt_pets": total_damage_dealt_pets,
+    "expected_damage_scale": expected_damage_scale,
+    "kills": kills,
+    "healing_dealt" : healing_dealt,
+    "damage_received" : damage_received,
+    "damage_resisted" : damage_resisted,
+    "deaths" : deaths,
+    "healing_received" : healing_received,
+    "primary_damage_stat" : primary_damage_stat,
+    "magic_damage" : magic_damage,
+    "armor_class" : armor_class,
+    "attack_speed_scaled" : attack_speed_scaled,
+    "movement_speed_scaled" : movement_speed_scaled,
+    "max_hp" : max_hp,
+    "average_group_size_scaled" : average_group_size_scaled,
+    "session_flags_bitfield" : session_flags_bitfield,
+    "time_rank" : time_rank,
+    "kills_score" : kills_score,
+    "accuracy_score" : accuracy_score,
+    "deaths_score" : deaths_score,
+    "treasure_score" : treasure_score,
+    "time_score" : time_score,
+    }
+    #pprint(log_block)
+    #print(f"power_stats_count = {len(entries)}")
+
+def read_class_166(br):
+    entry = {}
+
+    entry["stat_id"] = br.read_method_9()
+    entry["delta"]   = br.read_method_24()
+    entry["time"]    = br.read_method_24()
+
+    return entry
 
 #TODO...
 #these names may be wrong
