@@ -455,5 +455,111 @@
                 "value": "5000"
             }
         ]
+    },
+    "PKTTYPE_GAME_TO_MASTER_START_LEVEL": {
+        "packet_type": "0x24",
+        "description": "",
+        "buffers": [
+            {
+                "method": "write_method_4",
+                "value": "1"
+            },
+            {
+                "method": "write_method_13",
+                "value": "LevelsTut.swf"
+            },
+            {
+                "method": "write_method_13",
+                "value": "TutorialBoat"
+            },
+            {
+                "method": "write_method_6",
+                "value": "5,6"
+            },
+            {
+                "method": "write_method_6",
+                "value": "5,6"
+            },
+            {
+                "method": "write_method_4",
+                "value": "30"
+            },
+            {
+                "method": "write_method_13",
+                "value": "Hard"
+            },
+            {
+                "method": "write_method_13",
+                "value": "Hard"
+            },
+            {
+                "method": "write_method_11",
+                "value": "1,1"
+            }
+        ]
+    },
+    "PKTTYPE_GAME_TO_MASTER_PORT": {
+        "packet_type": "0x23",
+        "description": "",
+        "buffers": [
+            {
+                "method": "write_method_13",
+                "value": "127.0.0.1"
+            },
+            {
+                "method": "write_method_91",
+                "value": "8080"
+            }
+        ]
+    },
+    "Enter World ": {
+        "packet_type": "0x10",
+        "description": "",
+        "buffers": [
+            {
+                "method": "write_method_4",
+                "value": "1"
+            },
+            {
+                "method": "write_method_4",
+                "value": "1"
+            },
+            {
+                "method": "write_method_6",
+                "value": "1,2"
+            },
+            {
+                "method": "write_method_4",
+                "value": "1"
+            },
+            {
+                "method": "write_method_13",
+                "value": "DevPaladin"
+            },
+            {
+                "method": "write_method_11",
+                "value": "1,1"
+            },
+            {
+                "method": "write_method_13",
+                "value": "Paladin"
+            },
+            {
+                "method": "write_method_13",
+                "value": "Long"
+            },
+            {
+                "method": "write_method_13",
+                "value": "Do08"
+            },
+            {
+                "method": "write_method_13",
+                "value": "M01"
+            },
+            {
+                "method": "write_method_13",
+                "value": "F06"
+            }
+        ]
     }
 }
