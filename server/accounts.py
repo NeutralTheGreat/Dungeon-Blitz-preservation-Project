@@ -100,3 +100,29 @@ def save_characters(user_id: int, char_list: list[dict]):
 
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def find_user_by_character_name(name: str):
+    """
+    Finds a user and their character list by character name.
+    Returns (user_id, char_list, specific_char) or (None, None, None).
+    """
+    name = name.strip().lower()
+    accounts = load_accounts()
+    for user_id in accounts.values():
+        save_path = os.path.join(CHAR_SAVE_DIR, f"{user_id}.json")
+        if not os.path.exists(save_path):
+            continue
+            
+        try:
+            with open(save_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                
+            characters = data.get("characters", [])
+            for char in characters:
+                if char.get("name", "").strip().lower() == name:
+                    return user_id, characters, char
+        except (FileNotFoundError, json.JSONDecodeError):
+            continue
+            
+    return None, None, None

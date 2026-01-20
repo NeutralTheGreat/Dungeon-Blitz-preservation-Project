@@ -7,6 +7,8 @@ from constants import GearType, class_3, PowerType, Game, class_119
 from BitBuffer import BitBuffer
 from globals import build_start_skit_packet
 from missions import get_mission_extra
+from accounts import save_characters
+from globals import send_gold_reward, send_gear_reward, send_hp_update
 
 def handle_dungeon_run_report(session, data):
     br = BitReader(data[4:])
@@ -155,12 +157,107 @@ def handle_send_combat_stats(session, data):
         f"rev={stat_rev}"
     )
 
+    # Sync with player entity
+    ent = session.entities.get(session.clientEntID)
+    session.authoritative_max_hp = max_hp # Store on session for persistence across level loads
+    
+    if ent:
+        prev_max_hp = ent.get("max_hp", 0)
+        ent["max_hp"] = max_hp
+        
+        # If this is the first time we get stats or max_hp increased, 
+        # initialize hp if not already set or at old max
+        if "hp" not in ent or ent["hp"] == prev_max_hp:
+            ent["hp"] = max_hp
+        else:
+            # Ensure current HP doesn't exceed new max
+            ent["hp"] = min(ent["hp"], max_hp)
+
 
 #TODO...
 def handle_pickup_lootdrop(session, data):
     br = BitReader(data[4:])
     loot_id = br.read_method_9()
-    #print(f" loot id : {loot_id}")
+
+    # Check if we have record of this loot
+    loot = getattr(session, "pending_loot", {}).pop(loot_id, None)
+    
+    if loot:
+        char = session.current_char_dict
+        if not char: return
+
+        save_needed = False
+
+        if "gold" in loot:
+            amount = loot["gold"]
+            char["gold"] += amount
+            send_gold_reward(session, amount, show_fx=False)
+            save_needed = True
+            print(f"[Loot] {char['name']} picked up {amount} Gold.")
+
+        if "health" in loot:
+            hp_gain = loot["health"]
+            # Update entity HP
+            ent = session.entities.get(session.clientEntID)
+            
+            # Use session-based max_hp if available
+            # If not yet synced (authoritative_max_hp is None), we skip clamping to avoid false "Full" reports
+            max_hp = getattr(session, "authoritative_max_hp", None)
+            
+            if ent:
+                current_hp = ent.get("hp", 100)
+                
+                # Check if already at max HP (only if we have authoritative max_hp)
+                if max_hp is not None:
+                    ent["max_hp"] = max_hp # Keep entity in sync
+                    if current_hp >= max_hp:
+                        print(f"[Loot] {char['name']} picked up health globe but HP is full (HP: {current_hp}/{max_hp}).")
+                        return # Don't consume or heal if full
+                else:
+                    # If we don't have max_hp yet, assume not full (or use a huge fallback)
+                    print(f"[Loot] {char['name']} picked up health globe (MaxHP sync pending).")
+
+                new_hp = (min(max_hp, current_hp + hp_gain)) if max_hp else (current_hp + hp_gain)
+                actual_gain = new_hp - current_hp
+                ent["hp"] = new_hp
+                
+                # Send HP update to client
+                send_hp_update(session, session.clientEntID, actual_gain)
+                print(f"[Loot] {char['name']} healed +{actual_gain} HP (Final: {new_hp}/{max_hp if max_hp else '?'}).")
+            else:
+                 # Fallback for just updating session text if entity is missing temporarily
+                 print(f"[Loot] {char['name']} picked up health globe but entity is missing. HP Sync required.")
+            print(f"[Loot] {char['name']} picked up health globe (+{hp_gain} HP).")
+             
+        if "gear" in loot:
+            gear_id = loot["gear"]
+            tier = loot.get("tier", 1)
+            
+            # Create gear object
+            new_gear = {
+                "gearID": gear_id,
+                "tier": tier,
+                "runes": [0, 0, 0],
+                "colors": [0, 0]
+            }
+            
+            # Add to inventory
+            if "inventoryGears" not in char:
+                char["inventoryGears"] = []
+            
+            char["inventoryGears"].append(new_gear)
+            
+            # Trigger client notification "Received New Item"
+            send_gear_reward(session, gear_id, tier=tier)
+            
+            save_needed = True
+            print(f"[Loot] {char['name']} picked up Gear {gear_id} (Tier {tier}).")
+             
+        if save_needed:
+            save_characters(session.user_id, session.char_list)
+    else:
+        # print(f"Unknown loot pick up {loot_id}")
+        pass
 
 #TODO...
 def handle_queue_potion(session, data):
@@ -373,12 +470,13 @@ def handle_linkupdater(session, data):
     #pprint.pprint(props, indent=4)
 
 #TODO... this is just for testing
+_last_loot_id = 900000
 def generate_loot_id():
-    return random.randint(1_000_000, 9_999_999)
+    global _last_loot_id
+    _last_loot_id += 1
+    return _last_loot_id
 
 def handle_grant_reward(session, data):
-    return
-
     br = BitReader(data[4:])
 
     receiver_id = br.read_method_9()
@@ -403,44 +501,76 @@ def handle_grant_reward(session, data):
 
     killing_blow = br.read_method_15()
     combo = br.read_method_9() if killing_blow else 0
-    """
-    print("\n========== PKTTYPE_GRANT_REWARD (0x2A) ==========")
-    print(f" Receiver EntityID : {receiver_id}")
-    print(f" Source EntityID   : {source_id}")
-    print("-------------------------------------------------")
-    print(f" Drop Item Flag    : {drop_item}")
-    print(f" Item Multiplier   : {item_mult}")
-    print(f" Drop Gear Flag    : {drop_gear}")
-    print(f" Gear Multiplier   : {gear_mult}")
-    print(f" Drop Material     : {drop_material}")
-    print(f" Drop Trove        : {drop_trove}")
-    print("-------------------------------------------------")
-    print(f" EXP Granted       : {exp}")
-    print(f" Pet EXP Granted   : {pet_exp}")
-    print(f" HP Gain           : {hp_gain}")
-    print(f" Gold Granted      : {gold}")
-    print("-------------------------------------------------")
-    print(f" World X           : {world_x}")
-    print(f" World Y           : {world_y}")
-    print("-------------------------------------------------")
-    print(f" Killing Blow      : {killing_blow}")
-    if killing_blow:
-        print(f" Killer Combo ID   : {combo}")
-    print("-------------------------------------------------")
-    """
-    PROCESSED_REWARD_SOURCES = set()
+
+    # Deduplication: Check if this source has already been processed in this level
+    if not hasattr(session, "processed_reward_sources"):
+        session.processed_reward_sources = set()
+    
     reward_key = (session.current_level, source_id)
-    if reward_key in PROCESSED_REWARD_SOURCES:
+    if reward_key in session.processed_reward_sources:
         return
-    PROCESSED_REWARD_SOURCES.add(reward_key)
+    session.processed_reward_sources.add(reward_key)
 
-    drop_loot = True
+    # Physical Drops Only: We no longer add gold/xp directly to the character here.
+    # Everything must be collected via physical loot drops (globes/gold piles).
+    
+    process_drop_reward(session, world_x, world_y, gold, hp_gain, drop_gear, target_id=source_id)
+    
+    print(f"Granted Reward Request for {source_id}: XP={exp}, Gold={gold}, Item={drop_gear}")
 
-    if drop_loot:
+def process_drop_reward(session, x, y, gold=0, hp_gain=0, drop_gear=False, target_id=0):
+    # Initialize session tracking if needed
+    if not hasattr(session, "pending_loot"):
+        session.pending_loot = {}
+    if not hasattr(session, "processed_reward_sources"):
+        session.processed_reward_sources = set()
+
+    # Deduplication check
+    if target_id != 0:
+        reward_key = (session.current_level, target_id)
+        if reward_key in session.processed_reward_sources:
+            return
+        session.processed_reward_sources.add(reward_key)
+
+    # Drop Gold
+    if gold > 0:
+        lid = generate_loot_id()
+        # Store for pickup verification
+        session.pending_loot[lid] = {"gold": gold}
+        
         pkt = build_lootdrop(
-            loot_id=generate_loot_id(),
-            x=world_x,
-            y=world_y,
+            loot_id=lid,
+            x=x,
+            y=y,
+            gold=gold
+        )
+        session.conn.sendall(pkt)
+
+    # Drop Health
+    if hp_gain > 0:
+        lid = generate_loot_id()
+        session.pending_loot[lid] = {"health": hp_gain}
+        
+        pkt = build_lootdrop(
+            loot_id=lid,
+            x=x + random.randint(-15, 15),
+            y=y + random.randint(-15, 15),
+            health=hp_gain
+        )
+        session.conn.sendall(pkt)
+
+    # Drop Gear
+    if drop_gear:
+        lid = generate_loot_id()
+        # Tier 2 is Legendary as requested by user
+        session.pending_loot[lid] = {"gear": 140, "tier": 2}
+        
+        pkt = build_lootdrop(
+            loot_id=lid,
+            x=x + random.randint(-20, 20),
+            y=y + random.randint(-10, 10),
+            gear_id=140, 
+            gear_tier=2
         )
         session.conn.sendall(pkt)
 
@@ -448,6 +578,13 @@ def build_lootdrop(
         loot_id: int,
         x: int,
         y: int,
+        gear_id: int = 0,
+        gear_tier: int = 0,
+        material_id: int = 0,
+        gold: int = 0,
+        health: int = 0,
+        trove: int = 0,
+        dye_id: int = 0
 ):
     bb = BitBuffer()
 
@@ -455,31 +592,55 @@ def build_lootdrop(
     bb.write_method_45(x)
     bb.write_method_45(y)
 
-    # only one boolean must be True at a time if all False then the client will drop dyes
-
     # Gear branch
-    bb.write_method_15(False)
-    #bb.write_method_6(gear_id, GearType.GEARTYPE_BITSTOSEND)
-    #bb.write_method_6(tier, GearType.GEARTYPE_BITSTOSEND)  # 3 tears in total 0/2
+    if gear_id > 0:
+        bb.write_method_15(True)
+        bb.write_method_6(gear_id, GearType.GEARTYPE_BITSTOSEND)
+        bb.write_method_6(gear_tier, GearType.GEARTYPE_BITSTOSEND)
+        body = bb.to_bytes()
+        return struct.pack(">HH", 0x32, len(body)) + body
+    else:
+        bb.write_method_15(False)
 
-    # material Branch
-    bb.write_method_15(False)
-    #bb.write_method_4(Mat_ID)  # Materials ID 126 in Total
+    # Material Branch
+    if material_id > 0:
+        bb.write_method_15(True)
+        bb.write_method_4(material_id)
+        body = bb.to_bytes()
+        return struct.pack(">HH", 0x32, len(body)) + body
+    else:
+        bb.write_method_15(False)
 
     # Gold Branch
-    bb.write_method_15(False)
-    #bb.write_method_4(Gold_amount)
+    if gold > 0:
+        bb.write_method_15(True)
+        bb.write_method_4(gold)
+        body = bb.to_bytes()
+        return struct.pack(">HH", 0x32, len(body)) + body
+    else:
+        bb.write_method_15(False)
 
     # Health Branch
-    bb.write_method_15(False)
-    #bb.write_method_4(health_amount)
+    if health > 0:
+        bb.write_method_15(True)
+        bb.write_method_4(health)
+        body = bb.to_bytes()
+        return struct.pack(">HH", 0x32, len(body)) + body
+    else:
+        bb.write_method_15(False)
 
     # Chest Trove Branch
-    bb.write_method_15(False)
-    #bb.write_method_4(1)  # only one Trove is possible since only one exists ID 1
+    if trove > 0:
+        bb.write_method_15(True)
+        bb.write_method_4(trove)
+        body = bb.to_bytes()
+        return struct.pack(">HH", 0x32, len(body)) + body
+    else:
+        bb.write_method_15(False)
 
     # Fallback branch: dye ID
-    bb.write_method_4(1)  # 250 Dye IDs in total
+    val = dye_id if dye_id > 0 else 1
+    bb.write_method_4(val)
 
     body = bb.to_bytes()
     return struct.pack(">HH", 0x32, len(body)) + body
