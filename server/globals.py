@@ -18,8 +18,7 @@ class GlobalState:
         self.char_tokens = {} # Done
         self.token_char = {} # Done
         self.pending_world = {}# Done
-        self.level_npcs = {}# Done
-        self.level_players = {}# Done
+        self.level_entities = {}
         self.all_sessions = []
 
 # a single shared instance:

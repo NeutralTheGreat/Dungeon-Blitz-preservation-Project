@@ -292,17 +292,22 @@ def handle_gameserver_login(session, data):
 
     #print(f"[{session.addr}] Welcome: {char['name']} (token {token})")
 
-    npcs = ensure_level_npcs(session.current_level)
     if AI_ENABLED:
         ensure_ai_loop(session.current_level, run_ai_loop)
     else:
         pass
 
-    for npc in npcs.values():
+    ensure_level_npcs(session.current_level)
+    level_map = GS.level_entities.get(session.current_level, {})
+    npcs = [
+        ent["props"]
+        for ent in level_map.values()
+        if ent["kind"] == "npc"
+    ]
+    for npc in npcs:
         flat_npc = normalize_entity_for_send(npc)
         payload = Send_Entity_Data(flat_npc)
         session.conn.sendall(
             struct.pack(">HH", 0x0F, len(payload)) + payload
         )
         session.entities[npc["id"]] = npc
-    #print(f"[{session.addr}] NPCs synced for level {session.current_level}")

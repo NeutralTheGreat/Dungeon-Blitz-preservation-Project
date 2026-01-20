@@ -447,16 +447,15 @@ def handle_entity_full_update(session, data):
     # Update server-side map
     session.entities[entity_id] = props
 
-    # add player to level_players
-    if is_player:
-        players = GS.level_players.setdefault(session.current_level, [])
-        players[:] = [p for p in players if p["id"] != entity_id]
-        players.append({
-            "id": entity_id,
-            "pos_x": pos_x,
-            "pos_y": pos_y,
-            "session": session
-        })
+    level = session.current_level
+    level_map = GS.level_entities.setdefault(level, {})
+
+    level_map[entity_id] = {
+        "id": entity_id,
+        "kind": "player" if is_player else "npc",
+        "session": session if is_player else None,
+        "props": props,
+    }
 
     # ─────────────────────────────
     # spawn non-player entities (pets / minions) for other clients
@@ -481,7 +480,6 @@ def handle_entity_full_update(session, data):
             "buffs": [],
         }
 
-        register_level_npc(session.current_level, ent_dict)
         flat_ent = normalize_entity_for_send(ent_dict)
         pkt = Send_Entity_Data(flat_ent)
         framed = struct.pack(">HH", 0x0F, len(pkt)) + pkt
@@ -519,25 +517,29 @@ def handle_entity_full_update(session, data):
                     other.conn.sendall(framed)
                     #print(f"[JOIN] Broadcasted Send_Entity_Data for {ent_dict['name']} → {other.addr}")
 
-def ensure_level_npcs(level_name: str) -> dict:
-    existing = GS.level_npcs.get(level_name)
-    if existing is not None:
-        return existing
+def ensure_level_npcs(level_name: str) -> None:
+    if level_name in GS.level_entities:
+        return
 
     try:
         npcs = load_npc_data_for_level(level_name)
-        npc_map = {npc["id"]: npc for npc in npcs}
-        GS.level_npcs[level_name] = npc_map
-        # print(f"[LEVEL] Spawned {len(npc_map)} NPCs for {level_name}")
     except Exception as e:
         print(f"[LEVEL] Error loading NPCs for {level_name}: {e}")
-        GS.level_npcs[level_name] = {}
+        return
 
-    return GS.level_npcs[level_name]
+    level_map = GS.level_entities.setdefault(level_name, {})
 
-def register_level_npc(level_name: str, npc: dict):
-    level_map = GS.level_npcs.setdefault(level_name, {})
-    level_map[npc["id"]] = npc
+    for npc in npcs:
+        npc_id = npc["id"]
+        level_map[npc_id] = {
+            "id": npc_id,
+            "kind": "npc",
+            "session": None,
+            "props": npc,
+        }
+
+
+
 
 def normalize_entity_for_send(entity: dict) -> dict:
     out = dict(entity)

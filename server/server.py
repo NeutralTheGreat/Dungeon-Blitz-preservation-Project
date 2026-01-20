@@ -26,12 +26,19 @@ def _level_remove(level, session):
     if s and session in s:
         s.remove(session)
 
-    # Remove from level_players
-    players = GS.level_players.get(level)
-    if players:
-        GS.level_players[level] = [
-            p for p in players if p.get("session") is not session
-        ]
+    # Remove all entities owned by this session from the level
+    level_map = GS.level_entities.get(level)
+    if not level_map:
+        return
+
+    to_remove = [
+        eid for eid, ent in level_map.items()
+        if ent.get("session") is session
+    ]
+
+    for eid in to_remove:
+        del level_map[eid]
+
 
 
 def new_transfer_token():
