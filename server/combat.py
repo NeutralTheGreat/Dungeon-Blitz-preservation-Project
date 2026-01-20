@@ -224,6 +224,84 @@ def handle_power_hit(session, data):
     # Critical hit or special-flag
     is_critical = br.read_method_15()
 
+    # --- Server-Side Drop Logic ---
+    from Commands import process_drop_reward
+    from game_data import calculate_npc_hp, calculate_npc_gold, get_ent_type
+    import random
+
+    target = None
+    level = session.current_level
+
+    # Check session entities (players/pets)
+    if target_entity_id in session.entities:
+        target = session.entities[target_entity_id]
+    # Check level NPCs (shared)
+    elif level in GS.level_npcs and target_entity_id in GS.level_npcs[level]:
+        target = GS.level_npcs[level][target_entity_id]
+
+    if target:
+        ent_name = target.get("name")
+        # Initialize HP if missing (Authoritative fallback)
+        if "hp" not in target:
+            # Special initializtion for player from session metadata
+            if target_entity_id == session.clientEntID and hasattr(session, "authoritative_max_hp"):
+                max_hp = session.authoritative_max_hp
+                target["hp"] = max_hp
+                target["max_hp"] = max_hp
+                target["level"] = session.current_char_dict.get("level", 1)
+                target["rewards_granted"] = False
+            else:
+                # Get EntType data for level and scalars
+                ent_type_data = get_ent_type(ent_name) if ent_name else {}
+                npc_level = int(ent_type_data.get("Level", "1"))
+                
+                max_hp = calculate_npc_hp(ent_name, npc_level)
+                target["hp"] = max_hp
+                target["max_hp"] = max_hp
+                target["level"] = npc_level
+                target["rewards_granted"] = False
+        
+        current_hp = target["hp"]
+        new_hp = current_hp - damage_value
+        target["hp"] = new_hp
+
+        # print(f"[Combat] Entity {target_entity_id} HP: {current_hp} -> {new_hp}")
+
+        # Trigger reward ONLY on lethal damage and if not already granted
+        if new_hp <= 0 and current_hp > 0 and not target.get("rewards_granted", False):
+            # Verify it's an enemy (not player/pet/neutral)
+            team = target.get("team", 0)
+            if team == 2 or (not target.get("is_player", False) and team != 1 and team != 3):
+                target["rewards_granted"] = True
+                target["hp"] = 0
+                
+                npc_level = target.get("level", 1)
+                gold_amount = calculate_npc_gold(ent_name, npc_level)
+                
+                # Calculate HP gain for globe
+                # Small mobs (Minion) = 15% heal, Big mobs (Lieutenant/Boss) = 40% heal
+                # This scaling triggers the "Big Globe" visual in the client
+                player_max_hp = getattr(session, "authoritative_max_hp", 100)
+                rank = get_ent_type(ent_name).get("EntRank", "Minion")
+                
+                hp_percent = 0.4 if rank in ["Lieutenant", "Boss", "MiniBoss"] else 0.15
+                hp_gain = int(player_max_hp * hp_percent)
+
+                # High chance to drop rewards as requested
+                if random.random() < 0.9: 
+                    process_drop_reward(
+                        session, 
+                        target.get("x", 0), 
+                        target.get("y", 0), 
+                        gold=gold_amount, 
+                        hp_gain=hp_gain, 
+                        # Drop gear at 20% rate, always Tier 2 Legendary
+                        drop_gear=(random.random() < 0.2), 
+                        target_id=target_entity_id
+                    )
+                print(f"[Combat] Lethal on {ent_name} ({rank}). Dropping {gold_amount} Gold and {hp_gain} HP Globe.")
+
+
     # Forward packet unchanged to other clients in same level
     for other in GS.all_sessions:
         if (

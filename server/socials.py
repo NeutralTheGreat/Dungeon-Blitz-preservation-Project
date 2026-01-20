@@ -2,7 +2,7 @@ import secrets
 import struct
 
 from BitBuffer import BitBuffer
-from accounts import load_characters
+from accounts import load_characters, save_characters, find_user_by_character_name
 from GameState import state
 from bitreader import BitReader
 from constants import Entity
@@ -581,3 +581,173 @@ def handle_send_group_chat(session, data):
     # Send to ALL ONLINE members including sender
     for m, _ in online_group_members(group, GS.all_sessions):
         m.conn.sendall(pkt)
+
+
+def get_friend_name(friend_entry):
+    if isinstance(friend_entry, dict):
+        return friend_entry.get("name", "")
+    return str(friend_entry)
+
+def handle_friend_request(session, data):
+    br = BitReader(data[4:])
+    target_name = br.read_method_13()
+
+    if target_name.lower() == session.current_character.lower():
+        send_chat_status(session, "You cannot be friends with yourself.")
+        return
+
+    # 1. Update Sender's friend list
+    sender_char = session.current_char_dict
+    if "friends" not in sender_char:
+        sender_char["friends"] = []
+    
+    # Check if already friend (handle both string and dict)
+    already_friend = False
+    for f in sender_char["friends"]:
+        if get_friend_name(f).lower() == target_name.lower():
+            already_friend = True
+            break
+            
+    if not already_friend:
+        sender_char["friends"].append(target_name)
+    
+    # Save sender
+    save_characters(session.user_id, session.char_list)
+    
+    # 2. Update Target's friend list (Online or Offline)
+    target_session = find_online_session(GS.all_sessions, target_name)
+    
+    if target_session:
+        # ONLINE target
+        target_char = target_session.current_char_dict
+        if "friends" not in target_char:
+            target_char["friends"] = []
+        
+        t_already = False
+        for f in target_char["friends"]:
+            if get_friend_name(f).lower() == session.current_character.lower():
+                t_already = True
+                break
+
+        if not t_already:
+            target_char["friends"].append(session.current_character)
+            save_characters(target_session.user_id, target_session.char_list)
+            
+        send_chat_status(target_session, f"{session.current_character} added you as a friend.")
+        send_chat_status(session, f"You are now friends with {target_name}.")
+    
+    else:
+        # OFFLINE target
+        t_uid, t_chars, t_char = find_user_by_character_name(target_name)
+        if t_uid and t_char:
+            if "friends" not in t_char:
+                t_char["friends"] = []
+            
+            t_already = False
+            for f in t_char["friends"]:
+                if get_friend_name(f).lower() == session.current_character.lower():
+                    t_already = True
+                    break
+
+            if not t_already:
+                t_char["friends"].append(session.current_character)
+                save_characters(t_uid, t_chars)
+                
+            send_chat_status(session, f"Added {target_name} to friends (offline).")
+        else:
+            send_chat_status(session, f"Could not find player {target_name}.")
+
+
+def handle_request_friend_list(session, data):
+    """
+    Handles request for friend list (0xC9).
+    Sends back 0xCA with the full list.
+    Matching LinkUpdater.as/method_1827 and method_495.
+    """
+    friends = session.current_char_dict.get("friends", [])
+    
+    # Filter out empty entries
+    valid_friends = []
+    for f in friends:
+        name = get_friend_name(f)
+        if name:
+            valid_friends.append(f)
+
+    bb = BitBuffer(debug=False)
+    
+    # 0xCA starts with a count (method_4)
+    bb.write_method_4(len(valid_friends))
+    
+    for friend_entry in valid_friends:
+        friend_name = get_friend_name(friend_entry)
+        
+        # isRequest flag
+        is_request = False
+        if isinstance(friend_entry, dict):
+            is_request = friend_entry.get("isRequest", False)
+            
+        # Check if online
+        friend_sess = find_online_session(GS.all_sessions, friend_name)
+        is_online = friend_sess is not None
+                
+        # Defaults
+        level = 1
+        class_id = 0
+        char_name = friend_name
+        
+        if is_online:
+            f_char = friend_sess.current_char_dict
+            level = f_char.get("level", 1)
+            c_name = f_char.get("class", "Paladin")
+            class_id = {"Paladin": 0, "Rogue": 1, "Mage": 2}.get(c_name, 0)
+            char_name = friend_sess.current_character or friend_name
+        
+        # Write friend entry (matching LinkUpdater method_495)
+        bb.write_method_13(friend_name) # var_207 (Account name)
+        bb.write_method_15(is_request)  # var_276 (Is friend request?)
+        bb.write_method_15(is_online)   # bOnline
+        
+        if is_online:
+            # param2.charName = param1.method_11() ? param1.method_13() : name;
+            has_custom_char_name = (char_name != friend_name)
+            bb.write_method_15(has_custom_char_name)
+            if has_custom_char_name:
+                bb.write_method_13(char_name)
+                
+            bb.write_method_6(class_id, Entity.const_244) # Class bits
+            bb.write_method_6(level, Entity.MAX_CHAR_LEVEL_BITS) # Level bits
+
+    payload = bb.to_bytes()
+    session.conn.sendall(struct.pack(">HH", 0xCA, len(payload)) + payload)
+
+
+def handle_request_visit_player_house(session, data):
+    """
+    Handles request to visit a player's house (0xF3).
+    Reads target name, resolves their character data, and triggers teleport to CraftTown.
+    """
+    br = BitReader(data[4:])
+    target_name = br.read_method_13()
+    
+    # 1. Resolve character data
+    user_id, char_list, target_char = find_user_by_character_name(target_name)
+    
+    if not target_char:
+        send_chat_status(session, f"Cannot find house for player {target_name}.")
+        return
+        
+    # 2. Store target char for the level transfer handler
+    # Persistent across connection resets during transfer
+    GS.house_visits[session.clientEntID] = target_char
+    
+    # 3. Trigger DO_TARGET for CraftTown
+    # In level_config.py, door_id 999 is hardcoded to return to CraftTown
+    bb = BitBuffer()
+    bb.write_method_4(999) 
+    bb.write_method_13("CraftTown")
+
+    payload = bb.to_bytes()
+    resp = struct.pack(">HH", 0x2E, len(payload)) + payload
+    session.conn.sendall(resp)
+    
+    send_chat_status(session, f"Visiting {target_name}'s house...")

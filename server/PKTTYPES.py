@@ -17,7 +17,8 @@ from level_config import handle_open_door, handle_level_transfer_request, handle
 from login import handle_login_version, handle_login_create, handle_login_authenticate, handle_login_character_create, handle_character_select, handle_gameserver_login
 from pets import handle_equip_pets, handle_mount_equip_packet, handle_request_hatchery_eggs, handle_train_pet, handle_pet_training_collect, handle_pet_training_cancel, handle_pet_speed_up, handle_egg_hatch, handle_egg_speed_up, handle_collect_hatched_egg, handle_cancel_egg_hatch
 from skills import handle_skill_trained_claim, handle_skill_research_cancel_request, handle_skill_speed_up_request, handle_start_skill_training, handle_equip_active_skills
-from socials import handle_zone_panel_request, handle_public_chat, handle_private_message, handle_room_thought, handle_start_skit, handle_emote_begin, handle_group_invite, handle_query_message_answer, handle_map_location_update, handle_group_kick, handle_group_leave, handle_group_leader, handle_send_group_chat
+from socials import handle_zone_panel_request, handle_public_chat, handle_private_message, handle_room_thought, handle_start_skit, handle_emote_begin, handle_group_invite, handle_query_message_answer, handle_map_location_update, handle_group_kick, handle_group_leave, handle_group_leader, handle_send_group_chat, handle_friend_request, handle_request_friend_list, \
+    handle_request_visit_player_house
 from talent import handle_respec_talent_tree, handle_allocate_talent_tree_points, handle_talent_claim, handle_talent_speedup, handle_train_talent_point, handle_clear_talent_research, handle_active_talent_change_request
 
 
@@ -505,6 +506,9 @@ PACKET_HANDLERS = {
     0x66:   handle_group_leave,
     0x68:   handle_group_leader,
     0x63:   handle_send_group_chat,
+    0x90:   handle_friend_request,
+    0xC9:   handle_request_friend_list,
+    0xF3:   handle_request_visit_player_house,
     ############################################
 
     # pets.py

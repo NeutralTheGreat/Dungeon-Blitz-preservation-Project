@@ -21,6 +21,7 @@ class GlobalState:
         self.level_npcs = {}# Done
         self.level_players = {}# Done
         self.all_sessions = []
+        self.house_visits = {} # token -> owner_char
 
 # a single shared instance:
 GS = GlobalState()
@@ -253,6 +254,13 @@ def send_gear_reward(session, gear_id, tier=0, has_mods=False):
     bb.write_method_11(1 if has_mods else 0, 1)
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x33, len(payload)) + payload
+    session.conn.sendall(pkt)
+def send_hp_update(session, entity_id, delta):
+    bb = BitBuffer()
+    bb.write_method_4(entity_id)
+    bb.write_method_45(delta)
+    payload = bb.to_bytes()
+    pkt = struct.pack(">HH", 0x3A, len(payload)) + payload
     session.conn.sendall(pkt)
 
 

@@ -377,6 +377,12 @@ def handle_level_transfer_request(session, data):
         safe_old_y = 0
         has_old_coord = False
 
+    # Determine world owner for building data (usually the player themselves, unless visiting)
+    world_owner_char = GS.house_visits.get(player_token, char)
+    if player_token in GS.house_visits:
+        # Clear the flag so subsequent transfers (like leaving the house) return to normal
+        del GS.house_visits[player_token]
+
     pkt_out = build_enter_world_packet(
         transfer_token=new_token,
         old_level_id=0,
@@ -396,7 +402,7 @@ def handle_level_transfer_request(session, data):
         new_has_coord=new_has_coord,
         new_x=int(round(new_x)),
         new_y=int(round(new_y)),
-        char=char,
+        char=world_owner_char,
     )
 
     session.conn.sendall(pkt_out)
