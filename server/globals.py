@@ -21,6 +21,7 @@ class GlobalState:
         self.level_npcs = {}# Done
         self.level_players = {}# Done
         self.all_sessions = []
+        self.house_visits = {} # token -> owner_char
 
 # a single shared instance:
 GS = GlobalState()
