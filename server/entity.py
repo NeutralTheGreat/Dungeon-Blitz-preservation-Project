@@ -289,6 +289,8 @@ def build_entity_dict(eid, char, props):
         "y": int(props.get("pos_y", 0)),
         "v": int(props.get("velocity_x", 0)),
         "team": int(props.get("team", 1)),
+        "buffs": list(props.get("buffs", [])),
+        "facing_left": bool(props.get("b_left", False)),
     }
     if char:
         ent_dict.update({
