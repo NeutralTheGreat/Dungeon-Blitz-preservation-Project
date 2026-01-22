@@ -456,7 +456,25 @@ def handle_entity_full_update(session, data):
         "id": entity_id,
         "kind": "player" if is_player else "npc",
         "session": session if is_player else None,
-        "props": props,
+        "props": {
+            "id": entity_id,
+            "name": ent_name,
+            "is_player": is_player,
+            "x": int(pos_x),
+            "y": int(pos_y),
+            "v": int(velocity_x),
+            "team": int(team),
+            "untargetable": False,
+            "render_depth_offset": y_offset,
+            "behavior_speed": 0.0,
+            "cue_data": cue_data,
+            "summonerId": summoner_id or 0,
+            "power_id": power_id or 0,
+            "entState": ent_state,
+            "facing_left": b_left,
+            "health_delta": 0,
+            "buffs": [],
+        },
     }
 
     # ─────────────────────────────
@@ -523,16 +541,15 @@ def ensure_level_npcs(level_name: str) -> None:
     if level_name in GS.level_entities:
         return
 
-    try:
-        npcs = load_npc_data_for_level(level_name)
-    except Exception as e:
-        print(f"[LEVEL] Error loading NPCs for {level_name}: {e}")
-        return
-
+    npcs = load_npc_data_for_level(level_name)
     level_map = GS.level_entities.setdefault(level_name, {})
 
-    for npc in npcs:
-        npc_id = npc["id"]
+    for npc_template in npcs:
+        npc_id = allocate_entity_id()
+
+        npc = dict(npc_template)
+        npc["id"] = npc_id
+
         level_map[npc_id] = {
             "id": npc_id,
             "kind": "npc",
@@ -557,3 +574,17 @@ def normalize_entity_for_send(entity: dict) -> dict:
     out.setdefault("SleepAnim", "")
     return out
 
+
+def npc_container_to_entity(container: dict) -> dict:
+    props = container["props"]
+    out = dict(props)
+    out["id"] = container["id"]
+    out.setdefault("health_delta", 0)
+    out.setdefault("buffs", [])
+    return out
+
+
+def allocate_entity_id():
+    eid = GS.next_entity_id
+    GS.next_entity_id += 1
+    return eid

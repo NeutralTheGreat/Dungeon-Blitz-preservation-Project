@@ -19,6 +19,7 @@ class GlobalState:
         self.token_char = {} # Done
         self.pending_world = {}# Done
         self.level_entities = {}
+        self.next_entity_id = 100000
         self.all_sessions = []
 
 # a single shared instance:

@@ -216,6 +216,7 @@ def handle_gameserver_login(session, data):
     token        = br.read_method_9()
     Level_Swf_name = br.read_method_26()
     first_login   = br.read_method_15()
+    is_dev_client  = br.read_method_15()
 
     entry = GS.pending_world.get(token)
     if entry is None:
@@ -297,17 +298,21 @@ def handle_gameserver_login(session, data):
     else:
         pass
 
-    ensure_level_npcs(session.current_level)
-    level_map = GS.level_entities.get(session.current_level, {})
-    npcs = [
-        ent["props"]
-        for ent in level_map.values()
-        if ent["kind"] == "npc"
-    ]
-    for npc in npcs:
-        flat_npc = normalize_entity_for_send(npc)
-        payload = Send_Entity_Data(flat_npc)
-        session.conn.sendall(
-            struct.pack(">HH", 0x0F, len(payload)) + payload
-        )
-        session.entities[npc["id"]] = npc
+    # developer client will spawn its own npcs server does not need to send any
+    if is_dev_client:
+        print("Developer Client Detected skipping server spawned npcs ")
+    else:
+        ensure_level_npcs(session.current_level)
+        level_map = GS.level_entities.get(session.current_level, {})
+        npcs = [
+            ent["props"]
+            for ent in level_map.values()
+            if ent["kind"] == "npc"
+        ]
+        for npc in npcs:
+            flat_npc = normalize_entity_for_send(npc)
+            payload = Send_Entity_Data(flat_npc)
+            session.conn.sendall(
+                struct.pack(">HH", 0x0F, len(payload)) + payload
+            )
+            session.entities[npc["id"]] = npc
