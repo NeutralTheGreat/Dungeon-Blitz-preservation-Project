@@ -61,6 +61,7 @@ class ClientSession:
     def __init__(self, conn, addr):
         self.conn = conn
         self.addr = addr
+        self.running = True
 
         # Authentication / account
         self.user_id = None
@@ -69,18 +70,16 @@ class ClientSession:
         self.current_character = None # name of active character
         self.current_char_dict = None # dict of active character’s data
 
-        # World state
+        # world and  level
         self.current_level = None
         self.entry_level = None
         self.player_spawned = False
         self.clientEntID = None       # entity ID assigned to the player
 
-        # Entities / NPCs
-        self.entities = {}            # {eid: props} for all tracked entities in this session
+        #  entity tracking
+        self.entities = {}  # authoritative movement cache
 
-        # Misc
-        self.player_data = {}
-        self.running = True
+
 
 
     def stop(self):
