@@ -72,19 +72,28 @@ def broadcast_npc_move(npc, level_name, delta_x, delta_y, delta_vx):
 # ─────────────── AI loop per level ───────────────
 def run_ai_loop(level_name):
     """Threaded loop driving NPC AI + physics for one level."""
-    #print(f"[AI] Starting loop for level {level_name}")
 
     while True:
         time.sleep(AI_INTERVAL)
 
-        npcs = GS.level_npcs.get(level_name, {})
-        sessions = list(GS.level_registry.get(level_name, []))
-        players = GS.level_players.get(level_name, [])
+        level_map = GS.level_entities.get(level_name, {})
+
+        npcs = [
+            ent["props"]
+            for ent in level_map.values()
+            if ent["kind"] == "npc"
+        ]
+
+        players = [
+            ent["props"]
+            for ent in level_map.values()
+            if ent["kind"] == "player"
+        ]
 
         if not npcs or not players:
             continue
 
-        for npc in npcs.values():
+        for npc in npcs:
             npc["pos_x"] = npc.get("pos_x", npc.get("x", 0.0))
             npc["pos_y"] = npc.get("pos_y", npc.get("y", 0.0))
 
@@ -107,14 +116,6 @@ def run_ai_loop(level_name):
                     npc["brain_state"] = "idle"
                     npc["velocity_x"] = 0
 
-                    # when the NPC reaches, the player server sends this to stop the NPC from moving
-                    broadcast_npc_move(
-                        npc,
-                        level_name,
-                        delta_x=0,
-                        delta_y=0,
-                        delta_vx=0
-                    )
                     broadcast_npc_move(npc, level_name, 0, 0, 0)
                     continue
 
@@ -138,7 +139,6 @@ def run_ai_loop(level_name):
             npc["var_1258"] = npc["velocity_x"]
 
             if delta_x or delta_y:
-                #print(f"[AI] NPC {npc['id']} Δx={delta_x:.2f} vx={npc['velocity_x']:.2f}")
                 broadcast_npc_move(npc, level_name, delta_x, delta_y, delta_vx)
 
 # ─────────────── Thread management ───────────────

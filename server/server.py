@@ -26,12 +26,19 @@ def _level_remove(level, session):
     if s and session in s:
         s.remove(session)
 
-    # Remove from level_players
-    players = GS.level_players.get(level)
-    if players:
-        GS.level_players[level] = [
-            p for p in players if p.get("session") is not session
-        ]
+    # Remove all entities owned by this session from the level
+    level_map = GS.level_entities.get(level)
+    if not level_map:
+        return
+
+    to_remove = [
+        eid for eid, ent in level_map.items()
+        if ent.get("session") is session
+    ]
+
+    for eid in to_remove:
+        del level_map[eid]
+
 
 
 def new_transfer_token():
@@ -54,6 +61,7 @@ class ClientSession:
     def __init__(self, conn, addr):
         self.conn = conn
         self.addr = addr
+        self.running = True
 
         # Authentication / account
         self.user_id = None
@@ -62,18 +70,16 @@ class ClientSession:
         self.current_character = None # name of active character
         self.current_char_dict = None # dict of active character’s data
 
-        # World state
+        # world and  level
         self.current_level = None
         self.entry_level = None
         self.player_spawned = False
         self.clientEntID = None       # entity ID assigned to the player
 
-        # Entities / NPCs
-        self.entities = {}            # {eid: props} for all tracked entities in this session
+        #  entity tracking
+        self.entities = {}  # authoritative movement cache
 
-        # Misc
-        self.player_data = {}
-        self.running = True
+
 
 
     def stop(self):

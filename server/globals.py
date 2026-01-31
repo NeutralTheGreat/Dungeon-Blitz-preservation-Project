@@ -18,8 +18,8 @@ class GlobalState:
         self.char_tokens = {} # Done
         self.token_char = {} # Done
         self.pending_world = {}# Done
-        self.level_npcs = {}# Done
-        self.level_players = {}# Done
+        self.level_entities = {}
+        self.next_entity_id = 100000
         self.all_sessions = []
         self.house_visits = {} # token -> owner_char
 

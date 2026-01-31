@@ -122,7 +122,11 @@ def update_session_group_cache(gid, members):
 
 def handle_zone_panel_request(session, data):
     level = session.current_level
-    players = GS.level_players.get(level)
+    entities = GS.level_entities.get(level, {})
+    players = [
+        ent for ent in entities.values()
+        if ent["kind"] == "player"
+    ]
     send_zone_players_update(session, players)
 
 def handle_public_chat(session, data):

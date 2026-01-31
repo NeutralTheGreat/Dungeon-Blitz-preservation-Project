@@ -116,11 +116,10 @@ def handle_entity_destroy(session, data):
     if session.clientEntID == entity_id:
         session.clientEntID = None
 
-    # remove from authoritative NPC state
-    level_npcs = GS.level_npcs.get(level)
-    if level_npcs and entity_id in level_npcs:
-        del level_npcs[entity_id]
-        #print(f"[DESTROY] NPC {entity_id} removed from level {level}")
+    level_map = GS.level_entities.get(level)
+    if level_map and entity_id in level_map:
+        del level_map[entity_id]
+        # print(f"[DESTROY] Entity {entity_id} removed from level {level}")
 
     for other in GS.all_sessions:
         if (

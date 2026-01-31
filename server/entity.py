@@ -289,6 +289,8 @@ def build_entity_dict(eid, char, props):
         "y": int(props.get("pos_y", 0)),
         "v": int(props.get("velocity_x", 0)),
         "team": int(props.get("team", 1)),
+        "buffs": list(props.get("buffs", [])),
+        "facing_left": bool(props.get("b_left", False)),
     }
     if char:
         ent_dict.update({
@@ -447,16 +449,33 @@ def handle_entity_full_update(session, data):
     # Update server-side map
     session.entities[entity_id] = props
 
-    # add player to level_players
-    if is_player:
-        players = GS.level_players.setdefault(session.current_level, [])
-        players[:] = [p for p in players if p["id"] != entity_id]
-        players.append({
+    level = session.current_level
+    level_map = GS.level_entities.setdefault(level, {})
+
+    level_map[entity_id] = {
+        "id": entity_id,
+        "kind": "player" if is_player else "npc",
+        "session": session if is_player else None,
+        "props": {
             "id": entity_id,
-            "pos_x": pos_x,
-            "pos_y": pos_y,
-            "session": session
-        })
+            "name": ent_name,
+            "is_player": is_player,
+            "x": int(pos_x),
+            "y": int(pos_y),
+            "v": int(velocity_x),
+            "team": int(team),
+            "untargetable": False,
+            "render_depth_offset": y_offset,
+            "behavior_speed": 0.0,
+            "cue_data": cue_data,
+            "summonerId": summoner_id or 0,
+            "power_id": power_id or 0,
+            "entState": ent_state,
+            "facing_left": b_left,
+            "health_delta": 0,
+            "buffs": [],
+        },
+    }
 
     # ─────────────────────────────
     # spawn non-player entities (pets / minions) for other clients
@@ -481,7 +500,6 @@ def handle_entity_full_update(session, data):
             "buffs": [],
         }
 
-        register_level_npc(session.current_level, ent_dict)
         flat_ent = normalize_entity_for_send(ent_dict)
         pkt = Send_Entity_Data(flat_ent)
         framed = struct.pack(">HH", 0x0F, len(pkt)) + pkt
@@ -519,25 +537,28 @@ def handle_entity_full_update(session, data):
                     other.conn.sendall(framed)
                     #print(f"[JOIN] Broadcasted Send_Entity_Data for {ent_dict['name']} → {other.addr}")
 
-def ensure_level_npcs(level_name: str) -> dict:
-    existing = GS.level_npcs.get(level_name)
-    if existing is not None:
-        return existing
+def ensure_level_npcs(level_name: str) -> None:
+    if level_name in GS.level_entities:
+        return
 
-    try:
-        npcs = load_npc_data_for_level(level_name)
-        npc_map = {npc["id"]: npc for npc in npcs}
-        GS.level_npcs[level_name] = npc_map
-        # print(f"[LEVEL] Spawned {len(npc_map)} NPCs for {level_name}")
-    except Exception as e:
-        print(f"[LEVEL] Error loading NPCs for {level_name}: {e}")
-        GS.level_npcs[level_name] = {}
+    npcs = load_npc_data_for_level(level_name)
+    level_map = GS.level_entities.setdefault(level_name, {})
 
-    return GS.level_npcs[level_name]
+    for npc_template in npcs:
+        npc_id = allocate_entity_id()
 
-def register_level_npc(level_name: str, npc: dict):
-    level_map = GS.level_npcs.setdefault(level_name, {})
-    level_map[npc["id"]] = npc
+        npc = dict(npc_template)
+        npc["id"] = npc_id
+
+        level_map[npc_id] = {
+            "id": npc_id,
+            "kind": "npc",
+            "session": None,
+            "props": npc,
+        }
+
+
+
 
 def normalize_entity_for_send(entity: dict) -> dict:
     out = dict(entity)
@@ -553,3 +574,17 @@ def normalize_entity_for_send(entity: dict) -> dict:
     out.setdefault("SleepAnim", "")
     return out
 
+
+def npc_container_to_entity(container: dict) -> dict:
+    props = container["props"]
+    out = dict(props)
+    out["id"] = container["id"]
+    out.setdefault("health_delta", 0)
+    out.setdefault("buffs", [])
+    return out
+
+
+def allocate_entity_id():
+    eid = GS.next_entity_id
+    GS.next_entity_id += 1
+    return eid
