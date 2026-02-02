@@ -8,7 +8,7 @@ from BitBuffer import BitBuffer
 from globals import build_start_skit_packet
 from missions import get_mission_extra
 from accounts import save_characters
-from globals import send_gold_reward, send_gear_reward, send_hp_update
+from globals import send_gold_reward, send_gear_reward, send_hp_update, send_material_reward
 from game_data import get_random_gear_id
 
 def handle_dungeon_run_report(session, data):
@@ -254,6 +254,24 @@ def handle_pickup_lootdrop(session, data):
             save_needed = True
             print(f"[Loot] {char['name']} picked up Gear {gear_id} (Tier {tier}).")
              
+        if "material" in loot:
+            mat_id = loot["material"]
+            
+            # Add to inventory
+            mats = char.setdefault("materials", [])
+            found = False
+            for entry in mats:
+                if entry["materialID"] == mat_id:
+                    entry["count"] = int(entry.get("count", 0)) + 1
+                    found = True
+                    break
+            if not found:
+                mats.append({"materialID": mat_id, "count": 1})
+            
+            send_material_reward(session, mat_id)
+            save_needed = True
+            print(f"[Loot] {char['name']} picked up Material {mat_id}.")
+
         if save_needed:
             save_characters(session.user_id, session.char_list)
     else:
@@ -519,7 +537,7 @@ def handle_grant_reward(session, data):
     
     print(f"Granted Reward Request for {source_id}: XP={exp}, Gold={gold}, Item={drop_gear}")
 
-def process_drop_reward(session, x, y, gold=0, hp_gain=0, drop_gear=False, target_id=0):
+def process_drop_reward(session, x, y, gold=0, hp_gain=0, drop_gear=False, material_id=0, target_id=0):
     # Initialize session tracking if needed
     if not hasattr(session, "pending_loot"):
         session.pending_loot = {}
@@ -564,7 +582,8 @@ def process_drop_reward(session, x, y, gold=0, hp_gain=0, drop_gear=False, targe
     if drop_gear:
         lid = generate_loot_id()
         # Randomly select gear and use Tier 2 (Legendary)
-        gear_id = get_random_gear_id()
+        class_name = session.current_char_dict.get("class") if session.current_char_dict else None
+        gear_id = get_random_gear_id(class_name)
         session.pending_loot[lid] = {"gear": gear_id, "tier": 2}
         
         pkt = build_lootdrop(
@@ -573,6 +592,19 @@ def process_drop_reward(session, x, y, gold=0, hp_gain=0, drop_gear=False, targe
             y=y + random.randint(-10, 10),
             gear_id=gear_id, 
             gear_tier=2
+        )
+        session.conn.sendall(pkt)
+
+    # Drop Material
+    if material_id and material_id > 0:
+        lid = generate_loot_id()
+        session.pending_loot[lid] = {"material": material_id}
+        
+        pkt = build_lootdrop(
+            loot_id=lid,
+            x=x + random.randint(-20, 20),
+            y=y + random.randint(-10, 10),
+            material_id=material_id
         )
         session.conn.sendall(pkt)
 

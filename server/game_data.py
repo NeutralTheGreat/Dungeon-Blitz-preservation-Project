@@ -93,13 +93,67 @@ def calculate_npc_exp(ent_name, level):
     
     return round(MONSTER_EXP_TABLE[idx] * exp_mult)
 
-# Valid gear ID ranges for random drops
-# Based on paladin_template.json gear sets
-DROPPABLE_GEAR_IDS = list(range(1, 27)) + list(range(79, 160)) + list(range(200, 250))
 
-def get_random_gear_id():
-    """Returns a random gear ID for enemy drops."""
-    return random.choice(DROPPABLE_GEAR_IDS)
+# Valid gear ID ranges for random drops
+# We will now load them dynamically from class templates
+_gear_ids_by_class = {}
+DROPPABLE_GEAR_IDS_FALLBACK = list(range(1, 27)) + list(range(79, 160)) + list(range(200, 250))
+
+def load_class_gear_ids():
+    """Loads class-specific gear IDs from template files."""
+    if _gear_ids_by_class:
+        return
+
+    templates = {
+        "Paladin": "paladin_template.json",
+        "Rogue": "rogue_template.json",
+        "Mage": "mage_template.json"
+    }
+
+    for cls, filename in templates.items():
+        path = os.path.join("data", filename)
+        if not os.path.exists(path):
+            print(f"[WARN] {filename} not found")
+            continue
+        
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                inventory = data.get("inventoryGears", [])
+                # Collect all gearIDs from the inventory
+                gear_ids = [item.get("gearID", 0) for item in inventory if item.get("gearID", 0) > 0]
+                # Also include equipped gears if any
+                equipped = data.get("equippedGears", [])
+                gear_ids.extend([item.get("gearID", 0) for item in equipped if item.get("gearID", 0) > 0])
+                
+                _gear_ids_by_class[cls] = list(set(gear_ids)) # De-duplicate
+                # print(f"[INFO] Loaded {len(_gear_ids_by_class[cls])} gear IDs for {cls}")
+        except Exception as e:
+            print(f"[ERROR] Failed to load {filename}: {e}")
+
+def get_random_gear_id(class_name=None):
+    """Returns a random gear ID for enemy drops.
+       If class_name is provided, tries to return a gear ID suitable for that class.
+    """
+    if not _gear_ids_by_class:
+        load_class_gear_ids()
+
+    if class_name and class_name in _gear_ids_by_class:
+        ids = _gear_ids_by_class[class_name]
+        if ids:
+            return random.choice(ids)
+    
+    # Fallback if class not found or valid
+    if class_name:
+         # Try to match case-insensitive
+         for key in _gear_ids_by_class:
+             if key.lower() == class_name.lower():
+                 ids = _gear_ids_by_class[key]
+                 if ids:
+                     return random.choice(ids)
+
+    return random.choice(DROPPABLE_GEAR_IDS_FALLBACK)
+
 
 # Material system
 _materials_by_realm = {}
