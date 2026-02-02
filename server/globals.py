@@ -255,6 +255,22 @@ def send_gear_reward(session, gear_id, tier=0, has_mods=False):
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x33, len(payload)) + payload
     session.conn.sendall(pkt)
+
+def send_material_reward(session, material_id, amount=1, show_fx=True):
+    bb = BitBuffer()
+    bb.write_method_4(material_id)
+    bb.write_method_4(amount)
+    
+    # Payload format for 0x34 based on client usage (guessed/inferred):
+    # It might just require materialID (4 bytes) and maybe amount.
+    # The client might expect: [materialID:4][amount:4][show_fx:1?]
+    # Let's try simple first: ID and Amount.
+    
+    payload = bb.to_bytes()
+    pkt = struct.pack(">HH", 0x34, len(payload)) + payload
+    session.conn.sendall(pkt)
+    print(f"[{session.addr}] Sent material reward 0x34: mat={material_id}, amt={amount}")
+
 def send_hp_update(session, entity_id, delta):
     bb = BitBuffer()
     bb.write_method_4(entity_id)

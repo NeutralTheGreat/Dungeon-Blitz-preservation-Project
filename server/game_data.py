@@ -92,3 +92,118 @@ def calculate_npc_exp(ent_name, level):
     idx = max(0, min(level, len(MONSTER_EXP_TABLE) - 1))
     
     return round(MONSTER_EXP_TABLE[idx] * exp_mult)
+
+
+# Valid gear ID ranges for random drops
+# We will now load them dynamically from class templates
+_gear_ids_by_class = {}
+DROPPABLE_GEAR_IDS_FALLBACK = list(range(1, 27)) + list(range(79, 160)) + list(range(200, 250))
+
+def load_class_gear_ids():
+    """Loads class-specific gear IDs from template files."""
+    if _gear_ids_by_class:
+        return
+
+    templates = {
+        "Paladin": "paladin_template.json",
+        "Rogue": "rogue_template.json",
+        "Mage": "mage_template.json"
+    }
+
+    for cls, filename in templates.items():
+        path = os.path.join("data", filename)
+        if not os.path.exists(path):
+            print(f"[WARN] {filename} not found")
+            continue
+        
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                inventory = data.get("inventoryGears", [])
+                # Collect all gearIDs from the inventory
+                gear_ids = [item.get("gearID", 0) for item in inventory if item.get("gearID", 0) > 0]
+                # Also include equipped gears if any
+                equipped = data.get("equippedGears", [])
+                gear_ids.extend([item.get("gearID", 0) for item in equipped if item.get("gearID", 0) > 0])
+                
+                _gear_ids_by_class[cls] = list(set(gear_ids)) # De-duplicate
+                # print(f"[INFO] Loaded {len(_gear_ids_by_class[cls])} gear IDs for {cls}")
+        except Exception as e:
+            print(f"[ERROR] Failed to load {filename}: {e}")
+
+def get_random_gear_id(class_name=None):
+    """Returns a random gear ID for enemy drops.
+       If class_name is provided, tries to return a gear ID suitable for that class.
+    """
+    if not _gear_ids_by_class:
+        load_class_gear_ids()
+
+    if class_name and class_name in _gear_ids_by_class:
+        ids = _gear_ids_by_class[class_name]
+        if ids:
+            return random.choice(ids)
+    
+    # Fallback if class not found or valid
+    if class_name:
+         # Try to match case-insensitive
+         for key in _gear_ids_by_class:
+             if key.lower() == class_name.lower():
+                 ids = _gear_ids_by_class[key]
+                 if ids:
+                     return random.choice(ids)
+
+    return random.choice(DROPPABLE_GEAR_IDS_FALLBACK)
+
+
+# Material system
+_materials_by_realm = {}
+
+def load_materials():
+    """Load materials.json and organize by Realm."""
+    if _materials_by_realm:
+        return  # Already loaded
+    
+    path = os.path.join("data", "Materials.json")
+    if not os.path.exists(path):
+        print("[WARN] Materials.json not found")
+        return
+    
+    with open(path, "r", encoding="utf-8") as f:
+        materials = json.load(f)
+    
+    # Group materials by Realm and Rarity
+    for mat in materials:
+        realm = mat.get("DropRealm", "").strip()
+        rarity = mat.get("Rarity", "M").strip()
+        mat_id = int(mat.get("MaterialID", 0))
+        
+        if realm and mat_id > 0:
+            if realm not in _materials_by_realm:
+                _materials_by_realm[realm] = {"M": [], "R": [], "L": []}
+            
+            _materials_by_realm[realm][rarity].append(mat_id)
+
+def get_random_material_for_realm(realm):
+    """
+    Returns a random material ID for the given Realm.
+    Rarity chances: 70% Common (M), 25% Rare (R), 5% Legendary (L)
+    """
+    if not _materials_by_realm:
+        load_materials()
+    
+    if realm not in _materials_by_realm:
+        return None
+    
+    roll = random.random()
+    if roll < 0.05 and _materials_by_realm[realm]["L"]:
+        # 5% Legendary
+        return random.choice(_materials_by_realm[realm]["L"])
+    elif roll < 0.30 and _materials_by_realm[realm]["R"]:
+        # 25% Rare (0.05 to 0.30)
+        return random.choice(_materials_by_realm[realm]["R"])
+    else:
+        # 70% Common
+        if _materials_by_realm[realm]["M"]:
+            return random.choice(_materials_by_realm[realm]["M"])
+    
+    return None
