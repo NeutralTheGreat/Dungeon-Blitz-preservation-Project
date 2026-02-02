@@ -9,6 +9,7 @@ from globals import build_start_skit_packet
 from missions import get_mission_extra
 from accounts import save_characters
 from globals import send_gold_reward, send_gear_reward, send_hp_update
+from game_data import get_random_gear_id
 
 def handle_dungeon_run_report(session, data):
     br = BitReader(data[4:])
@@ -562,14 +563,15 @@ def process_drop_reward(session, x, y, gold=0, hp_gain=0, drop_gear=False, targe
     # Drop Gear
     if drop_gear:
         lid = generate_loot_id()
-        # Tier 2 is Legendary as requested by user
-        session.pending_loot[lid] = {"gear": 140, "tier": 2}
+        # Randomly select gear and use Tier 2 (Legendary)
+        gear_id = get_random_gear_id()
+        session.pending_loot[lid] = {"gear": gear_id, "tier": 2}
         
         pkt = build_lootdrop(
             loot_id=lid,
             x=x + random.randint(-20, 20),
             y=y + random.randint(-10, 10),
-            gear_id=140, 
+            gear_id=gear_id, 
             gear_tier=2
         )
         session.conn.sendall(pkt)

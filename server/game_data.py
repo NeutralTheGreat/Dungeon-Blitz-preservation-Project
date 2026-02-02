@@ -92,3 +92,64 @@ def calculate_npc_exp(ent_name, level):
     idx = max(0, min(level, len(MONSTER_EXP_TABLE) - 1))
     
     return round(MONSTER_EXP_TABLE[idx] * exp_mult)
+
+# Valid gear ID ranges for random drops
+# Based on paladin_template.json gear sets
+DROPPABLE_GEAR_IDS = list(range(1, 27)) + list(range(79, 160)) + list(range(200, 250))
+
+def get_random_gear_id():
+    """Returns a random gear ID for enemy drops."""
+    return random.choice(DROPPABLE_GEAR_IDS)
+
+# Material system
+_materials_by_realm = {}
+
+def load_materials():
+    """Load materials.json and organize by Realm."""
+    if _materials_by_realm:
+        return  # Already loaded
+    
+    path = os.path.join("data", "Materials.json")
+    if not os.path.exists(path):
+        print("[WARN] Materials.json not found")
+        return
+    
+    with open(path, "r", encoding="utf-8") as f:
+        materials = json.load(f)
+    
+    # Group materials by Realm and Rarity
+    for mat in materials:
+        realm = mat.get("DropRealm", "").strip()
+        rarity = mat.get("Rarity", "M").strip()
+        mat_id = int(mat.get("MaterialID", 0))
+        
+        if realm and mat_id > 0:
+            if realm not in _materials_by_realm:
+                _materials_by_realm[realm] = {"M": [], "R": [], "L": []}
+            
+            _materials_by_realm[realm][rarity].append(mat_id)
+
+def get_random_material_for_realm(realm):
+    """
+    Returns a random material ID for the given Realm.
+    Rarity chances: 70% Common (M), 25% Rare (R), 5% Legendary (L)
+    """
+    if not _materials_by_realm:
+        load_materials()
+    
+    if realm not in _materials_by_realm:
+        return None
+    
+    roll = random.random()
+    if roll < 0.05 and _materials_by_realm[realm]["L"]:
+        # 5% Legendary
+        return random.choice(_materials_by_realm[realm]["L"])
+    elif roll < 0.30 and _materials_by_realm[realm]["R"]:
+        # 25% Rare (0.05 to 0.30)
+        return random.choice(_materials_by_realm[realm]["R"])
+    else:
+        # 70% Common
+        if _materials_by_realm[realm]["M"]:
+            return random.choice(_materials_by_realm[realm]["M"])
+    
+    return None
