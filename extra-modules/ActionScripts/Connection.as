@@ -1,9 +1,5 @@
 package
 {
-   import flash.events.Event;
-   import flash.events.IOErrorEvent;
-   import flash.events.SecurityErrorEvent;
-   import flash.net.Socket;
    import flash.utils.ByteArray;
    
    public class Connection
@@ -36,7 +32,7 @@ package
       
       internal var var_1:Game;
       
-      private var socket:Socket;
+      private var transport:IConnectionTransport;
       
       internal var var_1203:Boolean;
       
@@ -56,106 +52,104 @@ package
          this.var_1 = param1;
          this.var_1248 = param3;
          this.var_1732 = param2;
-         this.socket = new Socket();
-         this.socket.addEventListener(Event.CONNECT,this.method_804);
-         this.socket.addEventListener(IOErrorEvent.IO_ERROR,this.method_849);
-         this.socket.addEventListener(SecurityErrorEvent.SECURITY_ERROR,this.method_1992);
-         this.socket.addEventListener(Event.CLOSE,this.method_652);
+         this.transport = new WebSocketTransport();
+         this.transport.onConnect = this.onTransportConnect;
+         this.transport.onClose = this.onTransportClose;
+         this.transport.onError = this.onTransportError;
       }
       
-      private function method_652(param1:Event) : void
+      private function onTransportClose():void
       {
          this.var_1203 = false;
       }
       
-      private function method_849(param1:Event) : void
+      private function onTransportError():void
       {
          this.var_1203 = false;
-         if(this.var_1248 != null)
+         if (this.var_1248 != null)
          {
             this.var_1248();
          }
       }
       
-      private function method_1992(param1:Event) : void
+      private function onTransportConnect():void
       {
-         this.var_1203 = false;
-         if(this.var_1248 != null)
+         if (this.var_1)
          {
-            this.var_1248();
-         }
-      }
-      
-      public function method_804(param1:Event) : void
-      {
-         if(this.var_1)
-         {
-            if(this.var_1.linkUpdater)
+            if (this.var_1.linkUpdater)
             {
                this.var_1.linkUpdater.method_756();
             }
             this.var_1.linkUpdater = new LinkUpdater(this.var_1);
          }
-         if(this.var_1732 != null)
+         if (this.var_1732 != null)
          {
             this.var_1732();
          }
       }
       
-      public function method_403(param1:String, param2:int) : void
+      public function method_804(param1:* = null):void
+      {
+         this.onTransportConnect();
+      }
+      
+      public function method_403(param1:String, param2:int):void
       {
          this.var_1203 = true;
-         this.socket.connect(param1,param2);
+         this.transport.connect(param1, param2);
       }
       
-      public function method_353() : Boolean
+      public function method_353():Boolean
       {
-         return this.socket.connected;
+         return this.transport.connected;
       }
       
-      public function method_205() : void
+      public function method_205():void
       {
-         if(this.socket.connected)
+         if (this.transport.connected)
          {
-            this.socket.close();
+            this.transport.close();
          }
          this.var_1203 = false;
-         this.socket.removeEventListener(Event.CONNECT,this.method_804);
-         this.socket.removeEventListener(IOErrorEvent.IO_ERROR,this.method_849);
-         this.socket.removeEventListener(Event.CLOSE,this.method_652);
          var_2094.push(this);
          this.var_1248 = null;
          this.var_1732 = null;
-         this.socket = null;
-         if(this.var_1)
+         this.transport = null;
+         
+         if (this.var_1)
          {
             this.var_1.linkUpdater = null;
             this.var_1 = null;
          }
       }
       
-      public function SendPacket(param1:Packet) : void
+      public function SendPacket(param1:Packet):void
       {
-         this.socket.writeShort(param1.type);
-         this.socket.writeShort(param1.var_50.method_685());
-         this.socket.writeBytes(param1.var_50.var_359);
-         this.socket.flush();
+         var packetData:ByteArray = new ByteArray();
+         packetData.writeShort(param1.type);
+         packetData.writeShort(param1.var_50.method_685());
+         packetData.writeBytes(param1.var_50.var_359);
+         this.transport.writeBytes(packetData);
+         this.transport.flush();
       }
       
-      public function method_918() : Vector.<Packet>
+      public function method_918():Vector.<Packet>
       {
          var _loc1_:int = 0;
          var _loc2_:int = 0;
          var _loc4_:ByteArray = null;
          var _loc5_:Packet = null;
+         var headerBuffer:ByteArray = null;
          var _loc3_:Vector.<Packet> = new Vector.<Packet>();
-         while(this.socket.bytesAvailable)
+         
+         while (this.transport.bytesAvailable)
          {
-            if(!this.var_1535 && this.socket.bytesAvailable < PACKET_HEADER_SIZE)
+            if (!this.var_1535 && this.transport.bytesAvailable < PACKET_HEADER_SIZE)
             {
                break;
             }
-            if(this.var_1535)
+            
+            if (this.var_1535)
             {
                _loc1_ = this.var_1535;
                _loc2_ = this.var_2121;
@@ -164,27 +158,34 @@ package
             }
             else
             {
-               _loc1_ = int(this.socket.readUnsignedShort());
-               _loc2_ = int(this.socket.readUnsignedShort());
+               headerBuffer = new ByteArray();
+               this.transport.readBytes(headerBuffer, 0, PACKET_HEADER_SIZE);
+               headerBuffer.position = 0;
+               _loc1_ = int(headerBuffer.readUnsignedShort());
+               _loc2_ = int(headerBuffer.readUnsignedShort());
             }
-            if(this.socket.bytesAvailable < _loc2_)
+            
+            if (this.transport.bytesAvailable < _loc2_)
             {
                this.var_1535 = _loc1_;
                this.var_2121 = _loc2_;
                break;
             }
+            
             _loc4_ = new ByteArray();
-            if(_loc2_)
+            if (_loc2_)
             {
-               this.socket.readBytes(_loc4_,0,_loc2_);
+               this.transport.readBytes(_loc4_, 0, _loc2_);
             }
-            _loc5_ = new Packet(_loc1_,_loc4_);
+            
+            _loc5_ = new Packet(_loc1_, _loc4_);
             _loc3_.push(_loc5_);
          }
+         
          return _loc3_;
       }
       
-      public function method_1935() : void
+      public function method_1935():void
       {
       }
    }

@@ -1,0 +1,27 @@
+package
+{
+   import flash.utils.ByteArray;
+   
+   public interface IConnectionTransport
+   {
+      function connect(host:String, port:int):void;
+      
+      function get connected():Boolean;
+      
+      function writeBytes(data:ByteArray):void;
+      
+      function flush():void;
+      
+      function readBytes(target:ByteArray, offset:uint, length:uint):void;
+      
+      function get bytesAvailable():uint;
+      
+      function close():void;
+      
+      function set onConnect(callback:Function):void;
+      
+      function set onClose(callback:Function):void;
+      
+      function set onError(callback:Function):void;
+   }
+}
