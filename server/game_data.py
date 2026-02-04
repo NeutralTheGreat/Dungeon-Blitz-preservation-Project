@@ -17,7 +17,8 @@ def get_ent_type(ent_name: str):
     return _ent_type_cache.get(ent_name)
 
 def load_ent_types():
-    path = os.path.join("data", "EntTypes.json")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(base_dir, "data", "EntTypes.json")
     if not os.path.exists(path):
         return
 
@@ -99,6 +100,55 @@ def calculate_npc_exp(ent_name, level):
 _gear_ids_by_class = {}
 DROPPABLE_GEAR_IDS_FALLBACK = list(range(1, 27)) + list(range(79, 160)) + list(range(200, 250))
 
+# Specific Drops (Realm/Boss)
+_gear_data = None
+
+def load_gear_data():
+    global _gear_data
+    if _gear_data: return
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(base_dir, "data", "gear_data.json")
+    if not os.path.exists(path):
+        print(f"[WARN] gear_data.json not found at {path}")
+        _gear_data = {"realm_drops": {}, "boss_drops": {}, "global_drops": []}
+        return
+
+    with open(path, "r", encoding="utf-8") as f:
+        _gear_data = json.load(f)
+
+def get_gear_id_for_entity(ent_name):
+    """
+    Returns a valid gear ID for the given entity based on Name (Boss) or Realm.
+    Returns None if no valid drops found.
+    """
+    if not _gear_data:
+        load_gear_data()
+    
+    ent_type = get_ent_type(ent_name)
+    if not ent_type:
+        return None
+    
+    # 1. Check Boss Drops (Specific Entity Name)
+    # Some bosses might have specific drops defined by name in gear_data
+    if ent_name in _gear_data.get("boss_drops", {}):
+        return random.choice(_gear_data["boss_drops"][ent_name])
+    
+    # 2. Check Realm Drops
+    realm = ent_type.get("Realm")
+    if realm and realm in _gear_data.get("realm_drops", {}):
+        return random.choice(_gear_data["realm_drops"][realm])
+    
+    # 3. Fallback: If no Realm or Boss match, but we have global drops?
+    # The user request implies strict drops ("check which item drops on who/which map").
+    # If the item doesn't have a Realm/Boss assigned, maybe it drops everywhere?
+    # For now, let's include global drops if no specific realm match found.
+    if _gear_data.get("global_drops"):
+        return random.choice(_gear_data["global_drops"])
+        
+    return None
+
+
 def load_class_gear_ids():
     """Loads class-specific gear IDs from template files."""
     if _gear_ids_by_class:
@@ -143,7 +193,6 @@ def get_random_gear_id(class_name=None):
         if ids:
             return random.choice(ids)
     
-    # Fallback if class not found or valid
     if class_name:
          # Try to match case-insensitive
          for key in _gear_ids_by_class:
@@ -152,6 +201,7 @@ def get_random_gear_id(class_name=None):
                  if ids:
                      return random.choice(ids)
 
+    # Legacy fallback - prefer get_gear_id_for_entity now
     return random.choice(DROPPABLE_GEAR_IDS_FALLBACK)
 
 
@@ -207,3 +257,42 @@ def get_random_material_for_realm(realm):
             return random.choice(_materials_by_realm[realm]["M"])
     
     return None
+
+def calculate_drop_data(ent_name, ent_level, ent_rank="Minion"):
+    """
+    Determines if gear should drop and what tier.
+    Returns: (should_drop_gear, gear_tier)
+    
+    Tiers:
+      0: Common
+      1: Rare
+      2: Legendary (Locked if level < 15)
+    
+    Chances (Cumulative):
+      Legendary: 0.2% (0.000 - 0.002)
+      Rare:      0.4% (0.002 - 0.006)
+      Common:    1.0% (0.006 - 0.016)
+    """
+    # 1. Check strict requirements
+    # Legendary (Tier 2) is blocked for early game
+    can_drop_legendary = (ent_level >= 15)
+
+    roll = random.random()
+    
+    # 2. Check Legendary Drop (Tier 2) - 0.2% Chance
+    if can_drop_legendary and roll < 0.002:
+        return True, 2
+        
+    # 3. Check Rare Drop (Tier 1) - 0.4% Chance
+    # Cumulative threshold: 0.002 + 0.004 = 0.006
+    if roll < 0.006:
+        # If we are here, it's < 0.006. 
+        # If it was < 0.002 and legendary was blocked, it becomes Rare.
+        return True, 1
+        
+    # 4. Check Common Drop (Tier 0) - 1.0% Chance
+    # Cumulative threshold: 0.006 + 0.010 = 0.016
+    if roll < 0.016:
+        return True, 0
+        
+    return False, 0
