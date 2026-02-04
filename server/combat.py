@@ -306,11 +306,46 @@ def handle_power_hit(session, data):
                     material_id = get_random_material_for_realm(realm)
 
                 # High chance to drop rewards as requested
-                if random.random() < 0.9: 
+                if random.random() < 0.9:
+                    drop_x = target.get("x", 0)
+                    drop_y = target.get("y", 0)
+
+                    # --- Hybrid Loot Drop Logic ---
+                    # 1. Flying Mobs: Spawn at Player Y (Ground) to prevent floating.
+                    # 2. Ground Mobs: Spawn at Mob Y (Ramp/Bridge) to prevent "inside ramp".
+                    
+                    is_flying = False
+                    ent_type_data = get_ent_type(ent_name) if ent_name else {}
+                    
+                    # Check static 'Flying' property
+                    if ent_type_data.get("Flying") == "True":
+                        is_flying = True
+                    
+                    # Also check dynamic airborne state if available (optional/future)
+                    
+                    if is_flying:
+                        # Use Player Position (Guaranteed Ground)
+                        player_ent = session.entities.get(session.clientEntID)
+                        if player_ent:
+                            if "pos_y" in player_ent:
+                                drop_y = int(player_ent["pos_y"])
+                            if "pos_x" in player_ent:
+                                # Add offset to avoid direct overlap
+                                offset = random.choice([-1, 1]) * random.randint(30, 60)
+                                drop_x = int(player_ent["pos_x"]) + offset
+                    else:
+                        # Ground Mob: Use Mob Position (Preserves Ramp/Bridge Y)
+                        # Ensure we don't accidentally spawn at 0,0 if target lacks coords
+                        if drop_x == 0 and drop_y == 0:
+                             player_ent = session.entities.get(session.clientEntID)
+                             if player_ent:
+                                 drop_x = int(player_ent.get("pos_x", 0))
+                                 drop_y = int(player_ent.get("pos_y", 0))
+
                     process_drop_reward(
                         session, 
-                        target.get("x", 0), 
-                        target.get("y", 0), 
+                        drop_x, 
+                        drop_y, 
                         gold=gold_amount, 
                         hp_gain=hp_gain, 
                         # Drop gear at 20% rate, always Tier 2 Legendary

@@ -532,7 +532,51 @@ def handle_grant_reward(session, data):
 
     # Physical Drops Only: We no longer add gold/xp directly to the character here.
     # Everything must be collected via physical loot drops (globes/gold piles).
+
+    # --- Hybrid Loot Drop Logic ---
+    # 1. Look up the source entity (Mob) to check if it's Flying.
+    # 2. Flying Mobs: Spawn at Player Y (Ground) with offset.
+    # 3. Ground Mobs: Spawn at Mob X/Y (Preserve Ramp Height) from packet.
     
+    from game_data import get_ent_type # ensure import available if not top-level
+    
+    is_flying = False
+    source_ent = None
+    ent_name = None
+    
+    # Try to find source entity
+    # Check session entities first
+    if source_id in session.entities:
+        source_ent = session.entities[source_id]
+    # Check global level NPCs
+    elif session.current_level in GS.level_npcs and source_id in GS.level_npcs[session.current_level]:
+        source_ent = GS.level_npcs[session.current_level][source_id]
+        
+    if source_ent:
+        ent_name = source_ent.get("name")
+        ent_type_data = get_ent_type(ent_name) if ent_name else {}
+        if ent_type_data.get("Flying") == "True":
+            is_flying = True
+
+    if is_flying:
+        # Use player's X and Y coordinate (Gravity Fallback)
+        player_ent = session.entities.get(session.clientEntID)
+        if player_ent:
+            if "pos_y" in player_ent:
+                world_y = int(player_ent["pos_y"])
+            if "pos_x" in player_ent:
+                # Add a small random offset (30-60 pixels) so loot doesn't spawn *inside* the player
+                offset = random.choice([-1, 1]) * random.randint(30, 60)
+                world_x = int(player_ent["pos_x"]) + offset
+    else:
+        # Ground Mob: Trust the coordinates reported by client (which likely match the mob's death location)
+        # OR force use of source_ent coordinates if available to be safe
+        if source_ent and "x" in source_ent and "y" in source_ent:
+             world_x = int(source_ent["x"])
+             world_y = int(source_ent["y"])
+
+    # print(f"[DEBUG_LOOT] Mob={source_id} Name={ent_name} Flying={is_flying} FinalX={world_x} FinalY={world_y}")
+
     process_drop_reward(session, world_x, world_y, gold, hp_gain, drop_gear, target_id=source_id)
     
     print(f"Granted Reward Request for {source_id}: XP={exp}, Gold={gold}, Item={drop_gear}")
