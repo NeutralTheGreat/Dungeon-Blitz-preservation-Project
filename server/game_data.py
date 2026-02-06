@@ -7,6 +7,69 @@ MONSTER_HP_TABLE = [100, 4920, 5580, 6020, 6520, 7040, 7580, 8180, 8800, 9480, 1
 MONSTER_GOLD_TABLE = [0, 43, 46, 49, 53, 57, 61, 65, 70, 75, 80, 86, 92, 98, 106, 113, 121, 130, 139, 149, 160, 171, 184, 197, 211, 226, 243, 260, 279, 299, 320, 343, 368, 394, 422, 453, 485, 520, 557, 597, 640, 686, 735, 788, 844, 905, 970, 1040, 1114, 1194, 1280]
 MONSTER_EXP_TABLE = [0, 10, 13, 15, 17, 20, 23, 26, 30, 35, 40, 46, 53, 61, 70, 80, 92, 106, 121, 139, 160, 184, 211, 243, 279, 320, 368, 422, 485, 557, 640, 735, 844, 970, 1114, 1280, 1470, 1689, 1940, 2229, 2560, 2941, 3378, 3880, 4457, 5120, 5881, 6756, 7760, 8914, 10240]
 
+# Player XP thresholds for levels 1-50 (index 0 unused, index 1 = level 1, etc.)
+# Based on the client's XP display showing ~4.3M for level 50 threshold
+PLAYER_XP_THRESHOLDS = [
+    0,          # Level 0 (unused)
+    0,          # Level 1
+    100,        # Level 2
+    350,        # Level 3
+    750,        # Level 4
+    1400,       # Level 5
+    2400,       # Level 6
+    3900,       # Level 7
+    6000,       # Level 8
+    9000,       # Level 9
+    13000,      # Level 10
+    18500,      # Level 11
+    26000,      # Level 12
+    36000,      # Level 13
+    49000,      # Level 14
+    66000,      # Level 15
+    88000,      # Level 16
+    116000,     # Level 17
+    152000,     # Level 18
+    198000,     # Level 19
+    256000,     # Level 20
+    330000,     # Level 21
+    424000,     # Level 22
+    544000,     # Level 23
+    697000,     # Level 24
+    893000,     # Level 25
+    1143000,    # Level 26
+    1462000,    # Level 27
+    1869000,    # Level 28
+    2387000,    # Level 29
+    3047000,    # Level 30
+    3420000,    # Level 31
+    3550000,    # Level 32
+    3680000,    # Level 33
+    3810000,    # Level 34
+    3940000,    # Level 35
+    4070000,    # Level 36
+    4100000,    # Level 37
+    4130000,    # Level 38
+    4160000,    # Level 39
+    4190000,    # Level 40
+    4220000,    # Level 41
+    4250000,    # Level 42
+    4280000,    # Level 43
+    4295000,    # Level 44
+    4310000,    # Level 45
+    4325000,    # Level 46
+    4340000,    # Level 47
+    4355000,    # Level 48
+    4367860,    # Level 49 (when you get this, you're at level 49)
+    4500000,    # Level 50 (if XP >= this, you're at max level 50)
+]
+
+def get_player_level_from_xp(xp: int) -> int:
+    """Calculate player level based on XP. Returns level 1-50."""
+    for level in range(len(PLAYER_XP_THRESHOLDS) - 1, 0, -1):
+        if xp >= PLAYER_XP_THRESHOLDS[level]:
+            return min(level, 50)
+    return 1
+
 _ent_type_cache = {}
 
 def get_ent_type(ent_name: str):

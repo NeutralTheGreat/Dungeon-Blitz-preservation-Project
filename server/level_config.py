@@ -336,6 +336,10 @@ def handle_level_transfer_request(session, data):
     session.current_character = char["name"]
     session.authenticated = True
 
+    # Update char reference to point to the freshly loaded character
+    char = next((c for c in session.char_list if c.get("name") == session.current_character), char)
+    session.current_char_dict = char
+
     # Resolve mission/special door overrides
     target_level = resolve_special_mission_doors(session, char, old_level, target_level)
 

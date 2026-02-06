@@ -246,16 +246,20 @@ def handle_gameserver_login(session, data):
     session.authenticated = True
     GS.current_characters[session.user_id] = session.current_character
 
-    # Save/update character list
+    # Load character list from disk and use the fresh data instead of stale in-memory char
     session.char_list = load_characters(session.user_id)
-    for i, c in enumerate(session.char_list):
-        if c["name"] == char["name"]:
-            session.char_list[i] = char
-            break
+    
+    # Find the character in the freshly loaded list (contains latest saved XP/level)
+    fresh_char = next((c for c in session.char_list if c.get("name") == char["name"]), None)
+    if fresh_char:
+        char = fresh_char  # Use fresh data from disk
     else:
+        # Character not found in disk, add it (new character case)
         session.char_list.append(char)
-
-    save_characters(session.user_id, session.char_list)
+        save_characters(session.user_id, session.char_list)
+    
+    # Update session to point to the fresh character
+    session.current_char_dict = char
     GS.pending_world.pop(token, None)
 
     # Spawn point

@@ -290,8 +290,16 @@ def handle_power_hit(session, data):
                 # Add XP to character and check for level up
                 char = session.current_char_dict
                 if char:
-                    current_xp = char.get("exp", 0) + xp_amount
-                    char["exp"] = current_xp
+                    current_xp = char.get("xp", 0) + xp_amount
+                    char["xp"] = current_xp
+                    
+                    # Auto level-up: calculate level from XP
+                    from game_data import get_player_level_from_xp
+                    old_level = char.get("level", 1)
+                    new_level = get_player_level_from_xp(current_xp)
+                    if new_level > old_level:
+                        char["level"] = new_level
+                        print(f"[Combat] {char.get('name', 'Player')} LEVELED UP! {old_level} -> {new_level}")
                     
                     # LOG only
                     print(f"[Combat] {char.get('name', 'Player')} gained {xp_amount} XP (Total: {current_xp})")
