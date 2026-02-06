@@ -324,7 +324,7 @@ def get_random_material_for_realm(realm):
     
     return None
 
-def calculate_drop_data(ent_name, ent_level, ent_rank="Minion"):
+def calculate_drop_data(ent_name, ent_level, ent_rank="Minion", item_find_bonus=0.0):
     """
     Determines if gear should drop and what tier.
     Returns: (should_drop_gear, gear_tier)
@@ -334,10 +334,12 @@ def calculate_drop_data(ent_name, ent_level, ent_rank="Minion"):
       1: Rare
       2: Legendary (Locked if level < 15)
     
-    Chances (Cumulative):
+    Base Chances (Cumulative):
       Legendary: 0.2% (0.000 - 0.002)
       Rare:      0.4% (0.002 - 0.006)
       Common:    1.0% (0.006 - 0.016)
+    
+    item_find_bonus: Multiplier from player's equipped charms (e.g., 0.10 = +10%)
     """
     # 1. Check strict requirements
     # Legendary (Tier 2) is blocked for early game
@@ -345,20 +347,27 @@ def calculate_drop_data(ent_name, ent_level, ent_rank="Minion"):
 
     roll = random.random()
     
+    # Apply item find bonus to thresholds (increases drop chance)
+    find_mult = 1.0 + item_find_bonus
+    
     # 2. Check Legendary Drop (Tier 2) - 0.2% Chance
-    if can_drop_legendary and roll < 0.002:
+    legendary_threshold = 0.002 * find_mult
+    if can_drop_legendary and roll < legendary_threshold:
         return True, 2
         
     # 3. Check Rare Drop (Tier 1) - 0.4% Chance
     # Cumulative threshold: 0.002 + 0.004 = 0.006
-    if roll < 0.006:
+    rare_threshold = 0.006 * find_mult
+    if roll < rare_threshold:
         # If we are here, it's < 0.006. 
         # If it was < 0.002 and legendary was blocked, it becomes Rare.
         return True, 1
         
     # 4. Check Common Drop (Tier 0) - 1.0% Chance
     # Cumulative threshold: 0.006 + 0.010 = 0.016
-    if roll < 0.016:
+    common_threshold = 0.016 * find_mult
+    if roll < common_threshold:
         return True, 0
         
     return False, 0
+

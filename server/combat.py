@@ -77,6 +77,24 @@ def broadcast_gear_change(session, all_sessions):
         ):
             other.conn.sendall(pkt)
 
+def send_gear_to_self(session):
+    """
+    Send gear packet to the player themselves.
+    This ensures the client recalculates find stats from equipped runes
+    after zone transitions.
+    """
+    char = session.current_char_dict
+    if not char:
+        return
+    
+    entity_id = session.clientEntID
+    if entity_id is None:
+        return
+    
+    equipped = char.get("equippedGears", [])
+    pkt = build_gear_change_packet(entity_id, equipped)
+    session.conn.sendall(pkt)
+
 def apply_and_broadcast_hp_delta(
     *,
     source_session,
@@ -228,6 +246,7 @@ def handle_power_hit(session, data):
     from Commands import process_drop_reward
     from game_data import calculate_npc_gold, calculate_npc_exp, get_ent_type, get_random_material_for_realm
     from game_data import calculate_npc_hp, calculate_npc_gold, get_ent_type, calculate_drop_data, get_gear_id_for_entity
+    from player_stats import calculate_find_bonuses, get_modified_gold, get_modified_drop_chance
     import random
 
     target = None
@@ -280,7 +299,14 @@ def handle_power_hit(session, data):
                 target["hp"] = 0
                 
                 npc_level = target.get("level", 1)
-                gold_amount = calculate_npc_gold(ent_name, npc_level)
+                
+                # Calculate player's find bonuses from equipped charm runes
+                char = session.current_char_dict
+                find_bonuses = calculate_find_bonuses(char) if char else {"gold_find": 0, "item_find": 0, "craft_find": 0}
+                
+                # Apply gold find bonus
+                base_gold = calculate_npc_gold(ent_name, npc_level)
+                gold_amount = get_modified_gold(base_gold, find_bonuses.get("gold_find", 0))
                 xp_amount = calculate_npc_exp(ent_name, npc_level)
                 
                 # Send XP reward immediately
@@ -327,13 +353,16 @@ def handle_power_hit(session, data):
                 # LEVEL_CONFIG[name] = (swf, map_id, base_id, is_dungeon)
                 is_dungeon = LEVEL_CONFIG.get(level, ("", 0, 0, False))[3]
 
-                if is_dungeon and realm and random.random() < 0.3:  # 30% chance to drop material
+                # Apply craft find bonus to material drop chance
+                base_material_chance = 0.3  # 30% base chance
+                material_chance = get_modified_drop_chance(base_material_chance, find_bonuses.get("craft_find", 0))
+                if is_dungeon and realm and random.random() < material_chance:
                     material_id = get_random_material_for_realm(realm)
 
-                # Calculate drops based on difficulty tiers
+                # Calculate drops based on difficulty tiers with item find bonus
                 specific_gear_id = None
                 if is_dungeon:
-                    should_drop_gear, gear_tier = calculate_drop_data(ent_name, npc_level, rank)
+                    should_drop_gear, gear_tier = calculate_drop_data(ent_name, npc_level, rank, find_bonuses.get("item_find", 0))
                     if should_drop_gear:
                         specific_gear_id = get_gear_id_for_entity(ent_name)
                         if not specific_gear_id:

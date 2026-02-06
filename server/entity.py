@@ -524,6 +524,11 @@ def handle_entity_full_update(session, data):
     if not session.player_spawned:
         session.player_spawned = True
         send_existing_entities_to_joiner(session)
+        
+        # Re-sync gear to self so client recalculates find stats from runes
+        from combat import send_gear_to_self
+        send_gear_to_self(session)
+
 
         # Broadcast THIS player’s spawn to others
         char = next(
