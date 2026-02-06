@@ -253,7 +253,10 @@ def handle_power_hit(session, data):
                 target["rewards_granted"] = False
             else:
                 # Get EntType data for level and scalars
-                ent_type_data = get_ent_type(ent_name) if ent_name else {}
+                ent_type_data = get_ent_type(ent_name) if ent_name else None
+                # Fix: Handle client-spawned entities not in EntTypes.json
+                if ent_type_data is None:
+                    ent_type_data = {}
                 npc_level = int(ent_type_data.get("Level", "1"))
                 
                 max_hp = calculate_npc_hp(ent_name, npc_level)
@@ -300,7 +303,9 @@ def handle_power_hit(session, data):
                 # Small mobs (Minion) = 15% heal, Big mobs (Lieutenant/Boss) = 40% heal
                 # This scaling triggers the "Big Globe" visual in the client
                 player_max_hp = getattr(session, "authoritative_max_hp", 100)
-                rank = get_ent_type(ent_name).get("EntRank", "Minion")
+                ent_type_for_rank = get_ent_type(ent_name)
+                # Fix: Handle client-spawned entities not in EntTypes.json
+                rank = ent_type_for_rank.get("EntRank", "Minion") if ent_type_for_rank else "Minion"
                 
                 hp_percent = 0.4 if rank in ["Lieutenant", "Boss", "MiniBoss"] else 0.15
                 hp_gain = int(player_max_hp * hp_percent)

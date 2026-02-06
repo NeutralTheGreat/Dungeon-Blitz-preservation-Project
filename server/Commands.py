@@ -574,6 +574,10 @@ def handle_grant_reward(session, data):
     if source_ent:
         ent_name = source_ent.get("name")
         ent_type_data = get_ent_type(ent_name) if ent_name else {}
+        # Fix: ensure ent_type_data is not None (get_ent_type can return None)
+        if ent_type_data is None:
+            ent_type_data = {}
+            
         if ent_type_data.get("Flying") == "True":
             is_flying = True
 
@@ -643,23 +647,21 @@ def process_drop_reward(session, x, y, gold=0, hp_gain=0, drop_gear=False, mater
 
     # Drop Gear
     if drop_gear:
-        lid = generate_loot_id()
-        if specific_gear_id:
+        # Only drop gear if we have a valid specific_gear_id
+        # The fallback get_random_gear_id() can return IDs without valid client graphics
+        if specific_gear_id and specific_gear_id > 0:
+            lid = generate_loot_id()
             gear_id = specific_gear_id
-        else:
-            # Randomly select gear using provided tier
-            class_name = session.current_char_dict.get("class") if session.current_char_dict else None
-            gear_id = get_random_gear_id(class_name)
-        session.pending_loot[lid] = {"gear": gear_id, "tier": gear_tier}
-        
-        pkt = build_lootdrop(
-            loot_id=lid,
-            x=x + random.randint(-20, 20),
-            y=y + random.randint(-10, 10),
-            gear_id=gear_id, 
-            gear_tier=gear_tier
-        )
-        session.conn.sendall(pkt)
+            session.pending_loot[lid] = {"gear": gear_id, "tier": gear_tier}
+            
+            pkt = build_lootdrop(
+                loot_id=lid,
+                x=x + random.randint(-20, 20),
+                y=y + random.randint(-10, 10),
+                gear_id=gear_id, 
+                gear_tier=gear_tier
+            )
+            session.conn.sendall(pkt)
 
     # Drop Material
     if material_id and material_id > 0:

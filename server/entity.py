@@ -98,7 +98,14 @@ def load_npc_data_for_level(level_name: str) -> list:
     json_path = os.path.join("world_npcs", f"{level_name}.json")
     try:
         with open(json_path, 'r') as file:
-            return json.load(file)
+            data = json.load(file)
+
+        # Filter out hostile enemies (team 2) for tutorial levels
+        # The user wants to ensure no enemies are spawned by the server in these areas
+        if level_name in ("CraftTownTutorial", "TutorialDungeon", "TutorialBoat"):
+            data = [npc for npc in data if npc.get("team") != 2]
+
+        return data
     except (FileNotFoundError, json.JSONDecodeError) as e:
         print(f"Error loading NPC data for {level_name}: {e}")
         return []
