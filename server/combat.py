@@ -284,11 +284,17 @@ def handle_power_hit(session, data):
                 send_xp_reward(session, xp_amount)
                 
                 # Add XP to character and check for level up
+                # Add XP to character and check for level up
                 char = session.current_char_dict
                 if char:
-                    char["exp"] = char.get("exp", 0) + xp_amount
-                    # TODO: Implement level-up check and save
-                    print(f"[Combat] {char.get('name', 'Player')} gained {xp_amount} XP (Total: {char['exp']})")
+                    current_xp = char.get("exp", 0) + xp_amount
+                    char["exp"] = current_xp
+                    
+                    # LOG only
+                    print(f"[Combat] {char.get('name', 'Player')} gained {xp_amount} XP (Total: {current_xp})")
+
+                    # SAVE PROGRESS (Fixes reset bug)
+                    save_characters(session.user_id, session.char_list)
                 
                 # Calculate HP gain for globe
                 # Small mobs (Minion) = 15% heal, Big mobs (Lieutenant/Boss) = 40% heal

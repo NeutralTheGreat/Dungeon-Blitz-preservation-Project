@@ -8,8 +8,9 @@ from BitBuffer import BitBuffer
 from globals import build_start_skit_packet
 from missions import get_mission_extra
 from accounts import save_characters
-from globals import send_gold_reward, send_gear_reward, send_hp_update, send_material_reward, GS
+from globals import send_gold_reward, send_gear_reward, send_hp_update, send_material_reward, GS, send_npc_dialog
 from game_data import get_random_gear_id
+from data.npc_chats import NPC_CHATS
 
 def handle_dungeon_run_report(session, data):
     br = BitReader(data[4:])
@@ -378,6 +379,14 @@ def handle_talk_to_npc(session, data):
                 dialogue_id = 5  # PraiseText
                 mission_id = mid
                 break
+
+    # Fallback: Bubble Chat if no mission dialogue is triggered
+    if dialogue_id == 0:
+        if npc_type_norm in NPC_CHATS:
+            text = random.choice(NPC_CHATS[npc_type_norm])
+            send_npc_dialog(session, npc_id, text)
+            print(f"[{session.addr}] [PKT0x7A] Bubble Chat {ent_type}: \"{text}\"")
+            return
 
     pkt = build_start_skit_packet(npc_id, dialogue_id, mission_id)
     session.conn.sendall(pkt)

@@ -117,6 +117,9 @@ def load_gear_data():
     with open(path, "r", encoding="utf-8") as f:
         _gear_data = json.load(f)
 
+
+
+
 def get_gear_id_for_entity(ent_name):
     """
     Returns a valid gear ID for the given entity based on Name (Boss) or Realm.
