@@ -29,9 +29,6 @@ GS = GlobalState()
 
 all_sessions = GS.all_sessions
 
-
-
-
 SECRET_HEX = "815bfb010cd7b1b4e6aa90abc7679028"
 SECRET      = bytes.fromhex(SECRET_HEX)
 
