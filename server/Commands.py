@@ -8,7 +8,7 @@ from BitBuffer import BitBuffer
 from globals import build_start_skit_packet
 from missions import get_mission_extra
 from accounts import save_characters
-from globals import send_gold_reward, send_gear_reward, send_hp_update, send_material_reward
+from globals import send_gold_reward, send_gear_reward, send_hp_update, send_material_reward, GS
 from game_data import get_random_gear_id
 
 def handle_dungeon_run_report(session, data):
@@ -525,6 +525,16 @@ def handle_grant_reward(session, data):
     if not hasattr(session, "processed_reward_sources"):
         session.processed_reward_sources = set()
     
+    # Check if the NPC exists and has already granted rewards (Authoritative Check)
+    level_npcs = GS.level_npcs.get(session.current_level, {})
+    npc = level_npcs.get(source_id)
+    
+    if npc:
+        if npc.get("rewards_granted", False):
+            print(f"[EXPLOIT PREVENTED] {session.addr} tried to claim rewards from {source_id} again.")
+            return
+        npc["rewards_granted"] = True
+
     reward_key = (session.current_level, source_id)
     if reward_key in session.processed_reward_sources:
         return
@@ -532,12 +542,56 @@ def handle_grant_reward(session, data):
 
     # Physical Drops Only: We no longer add gold/xp directly to the character here.
     # Everything must be collected via physical loot drops (globes/gold piles).
+
+    # --- Hybrid Loot Drop Logic ---
+    # 1. Look up the source entity (Mob) to check if it's Flying.
+    # 2. Flying Mobs: Spawn at Player Y (Ground) with offset.
+    # 3. Ground Mobs: Spawn at Mob X/Y (Preserve Ramp Height) from packet.
     
+    from game_data import get_ent_type # ensure import available if not top-level
+    
+    is_flying = False
+    source_ent = None
+    ent_name = None
+    
+    # Try to find source entity
+    # Check session entities first
+    if source_id in session.entities:
+        source_ent = session.entities[source_id]
+    # Check global level NPCs
+    elif session.current_level in GS.level_npcs and source_id in GS.level_npcs[session.current_level]:
+        source_ent = GS.level_npcs[session.current_level][source_id]
+        
+    if source_ent:
+        ent_name = source_ent.get("name")
+        ent_type_data = get_ent_type(ent_name) if ent_name else {}
+        if ent_type_data.get("Flying") == "True":
+            is_flying = True
+
+    if is_flying:
+        # Use player's X and Y coordinate (Gravity Fallback)
+        player_ent = session.entities.get(session.clientEntID)
+        if player_ent:
+            if "pos_y" in player_ent:
+                world_y = int(player_ent["pos_y"])
+            if "pos_x" in player_ent:
+                # Add a small random offset (30-60 pixels) so loot doesn't spawn *inside* the player
+                offset = random.choice([-1, 1]) * random.randint(30, 60)
+                world_x = int(player_ent["pos_x"]) + offset
+    else:
+        # Ground Mob: Trust the coordinates reported by client (which likely match the mob's death location)
+        # OR force use of source_ent coordinates if available to be safe
+        if source_ent and "x" in source_ent and "y" in source_ent:
+             world_x = int(source_ent["x"])
+             world_y = int(source_ent["y"])
+
+    # print(f"[DEBUG_LOOT] Mob={source_id} Name={ent_name} Flying={is_flying} FinalX={world_x} FinalY={world_y}")
+
     process_drop_reward(session, world_x, world_y, gold, hp_gain, drop_gear, target_id=source_id)
     
     print(f"Granted Reward Request for {source_id}: XP={exp}, Gold={gold}, Item={drop_gear}")
 
-def process_drop_reward(session, x, y, gold=0, hp_gain=0, drop_gear=False, material_id=0, target_id=0):
+def process_drop_reward(session, x, y, gold=0, hp_gain=0, drop_gear=False, material_id=0, target_id=0, gear_tier=0, specific_gear_id=None):
     # Initialize session tracking if needed
     if not hasattr(session, "pending_loot"):
         session.pending_loot = {}
@@ -581,17 +635,20 @@ def process_drop_reward(session, x, y, gold=0, hp_gain=0, drop_gear=False, mater
     # Drop Gear
     if drop_gear:
         lid = generate_loot_id()
-        # Randomly select gear and use Tier 2 (Legendary)
-        class_name = session.current_char_dict.get("class") if session.current_char_dict else None
-        gear_id = get_random_gear_id(class_name)
-        session.pending_loot[lid] = {"gear": gear_id, "tier": 2}
+        if specific_gear_id:
+            gear_id = specific_gear_id
+        else:
+            # Randomly select gear using provided tier
+            class_name = session.current_char_dict.get("class") if session.current_char_dict else None
+            gear_id = get_random_gear_id(class_name)
+        session.pending_loot[lid] = {"gear": gear_id, "tier": gear_tier}
         
         pkt = build_lootdrop(
             loot_id=lid,
             x=x + random.randint(-20, 20),
             y=y + random.randint(-10, 10),
             gear_id=gear_id, 
-            gear_tier=2
+            gear_tier=gear_tier
         )
         session.conn.sendall(pkt)
 

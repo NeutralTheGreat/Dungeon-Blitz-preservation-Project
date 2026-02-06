@@ -5,6 +5,7 @@ from accounts import save_characters
 from bitreader import BitReader
 from constants import Entity, PowerType, GearType, class_64, class_1, EntType, class_21, Game
 from globals import send_consumable_update, build_change_offset_y_packet, GS, send_xp_reward
+from level_config import LEVEL_CONFIG
 
 
                 # Helpers
@@ -226,7 +227,7 @@ def handle_power_hit(session, data):
     # --- Server-Side Drop Logic ---
     from Commands import process_drop_reward
     from game_data import calculate_npc_gold, calculate_npc_exp, get_ent_type, get_random_material_for_realm
-    from game_data import calculate_npc_hp, calculate_npc_gold, get_ent_type
+    from game_data import calculate_npc_hp, calculate_npc_gold, get_ent_type, calculate_drop_data, get_gear_id_for_entity
     import random
 
     target = None
@@ -302,10 +303,26 @@ def handle_power_hit(session, data):
                 ent_type_data = get_ent_type(ent_name)
                 realm = ent_type_data.get("Realm", "") if ent_type_data else ""
                 material_id = None
-                if realm and random.random() < 0.3:  # 30% chance to drop material
+                
+                # Check if current level is a dungeon
+                # LEVEL_CONFIG[name] = (swf, map_id, base_id, is_dungeon)
+                is_dungeon = LEVEL_CONFIG.get(level, ("", 0, 0, False))[3]
+
+                if is_dungeon and realm and random.random() < 0.3:  # 30% chance to drop material
                     material_id = get_random_material_for_realm(realm)
 
-                # High chance to drop rewards as requested
+                # Calculate drops based on difficulty tiers
+                specific_gear_id = None
+                if is_dungeon:
+                    should_drop_gear, gear_tier = calculate_drop_data(ent_name, npc_level, rank)
+                    if should_drop_gear:
+                        specific_gear_id = get_gear_id_for_entity(ent_name)
+                        if not specific_gear_id:
+                            # If no valid drops for this specific enemy/realm, cancel the gear drop
+                            should_drop_gear = False
+                else:
+                    should_drop_gear, gear_tier = False, 0
+
                 if random.random() < 0.9: 
                     process_drop_reward(
                         session, 
@@ -313,10 +330,11 @@ def handle_power_hit(session, data):
                         target.get("y", 0), 
                         gold=gold_amount, 
                         hp_gain=hp_gain, 
-                        # Drop gear at 20% rate, always Tier 2 Legendary
-                        drop_gear=(random.random() < 0.2),
+                        drop_gear=should_drop_gear,
+                        gear_tier=gear_tier,
                         material_id=material_id,
-                        target_id=target_entity_id
+                        target_id=target_entity_id,
+                        specific_gear_id=specific_gear_id
                     )
                 print(f"[Combat] Lethal on {ent_name} ({rank}, Realm={realm}). Dropping {gold_amount} Gold, {hp_gain} HP, XP={xp_amount}, Material={material_id}.")
 
