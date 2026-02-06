@@ -11,14 +11,15 @@ PORT_HTTP = 8081
 
 class GlobalState:
     def __init__(self):
-        self.current_characters = {}# Done
-        self.used_tokens = {}# Done
-        self.session_by_token = {}# Done
+        self.current_characters = {}
+        self.used_tokens = {}
+        self.session_by_token = {}
         self.level_registry = {}
-        self.char_tokens = {} # Done
-        self.token_char = {} # Done
-        self.pending_world = {}# Done
+        self.char_tokens = {} 
+        self.token_char = {} 
+        self.pending_world = {}
         self.level_entities = {}
+        self.level_npcs = self.level_entities 
         self.next_entity_id = 100000
         self.all_sessions = []
         self.house_visits = {} # token -> owner_char
