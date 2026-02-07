@@ -328,6 +328,7 @@ CHARM_DB      = {int(c["CharmID"]): c for c in _load_json(os.path.join(DATA_DIR,
 CONSUMABLES   = _load_json(os.path.join(DATA_DIR, "ConsumableTypes.json"), [])
 EGG_TYPES     = _load_json(os.path.join(DATA_DIR, "egg_types.json"), [])
 PET_TYPES     = _load_json(os.path.join(DATA_DIR, "pet_types.json"), [])
+MOUNT_IDS     = _load_json(os.path.join(DATA_DIR, "mount_ids.json"), {})
 
 CONSUMABLE_BOOSTS = {
     int(c.get("ConsumableID", 0)): {
@@ -356,6 +357,9 @@ MATERIALS_DATA = {
     int(m["MaterialID"]): m
     for m in _load_json(os.path.join(DATA_DIR, "Materials.json"), [])
 }
+
+def get_mount_id(name: str) -> int:
+    return MOUNT_IDS.get(name, 0)
 
 
 def load_class_template(class_name: str) -> dict:
