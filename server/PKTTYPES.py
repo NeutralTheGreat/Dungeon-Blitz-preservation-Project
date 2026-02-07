@@ -20,6 +20,7 @@ from skills import handle_skill_trained_claim, handle_skill_research_cancel_requ
 from socials import handle_zone_panel_request, handle_public_chat, handle_private_message, handle_room_thought, handle_start_skit, handle_emote_begin, handle_group_invite, handle_query_message_answer, handle_map_location_update, handle_group_kick, handle_group_leave, handle_group_leader, handle_send_group_chat, handle_friend_request, handle_request_friend_list, \
     handle_request_visit_player_house
 from talent import handle_respec_talent_tree, handle_allocate_talent_tree_points, handle_talent_claim, handle_talent_speedup, handle_train_talent_point, handle_clear_talent_research, handle_active_talent_change_request
+from sigil_store import handle_royal_sigil_store_purchase
 
 
 
@@ -545,6 +546,7 @@ PACKET_HANDLERS = {
     0x7A:   handle_talk_to_npc,
     0x8E:   handle_change_look,
     0xBA:   handle_apply_dyes,
+    0x106:  handle_royal_sigil_store_purchase,  # Royal Sigil Store purchase
     0x107:  handle_lockbox_reward,
     0x10E:  handle_queue_potion,
     0xBB:   handle_hp_increase_notice,

@@ -3,12 +3,12 @@ import random
 import time
 
 from bitreader import BitReader
-from constants import GearType, class_3, PowerType, Game, class_119
+from constants import GearType, class_3, PowerType, Game, class_119, PET_TYPES
 from BitBuffer import BitBuffer
 from globals import build_start_skit_packet
 from missions import get_mission_extra
 from accounts import save_characters
-from globals import send_gold_reward, send_gear_reward, send_hp_update, send_material_reward, GS, send_npc_dialog
+from globals import send_gold_reward, send_gear_reward, send_hp_update, send_material_reward, GS, send_npc_dialog, send_consumable_reward, send_charm_reward, send_mount_reward, send_dye_reward, send_new_pet_packet
 from game_data import get_random_gear_id
 from data.npc_chats import NPC_CHATS
 
@@ -403,29 +403,35 @@ def handle_lockbox_reward(session, data):
     ID_BITS = 6
     PACK_ID = 1
     reward_map = {
-        0: ("MountLockbox01L01", True),  # Mount
-        1: ("Lockbox01L01", True),  # Pet
-        # 2: ("GenericBrown", True),  # Egg
-        # 3: ("CommonBrown", True),  # Egg
-        # 4: ("OrdinaryBrown", True),  # Egg
-        # 5: ("PlainBrown", True),  # Egg
-        6: ("RarePetFood", True),  # Consumable
-        7: ("PetFood", True),  # Consumable
-        # 8: ("Lockbox01Gear", True),  # Gear (will crash if invalid)
-        9: ("TripleFind", True),  # Charm
-        10: ("DoubleFind1", True),  # Charm
-        11: ("DoubleFind2", True),  # Charm
-        12: ("DoubleFind3", True),  # Charm
-        13: ("MajorLegendaryCatalyst", True),  # Consumable
-        14: ("MajorRareCatalyst", True),  # Consumable
-        15: ("MinorRareCatalyst", True),  # Consumable
-        16: (None, False),  # Gold (3 000 000)
-        17: (None, False),  # Gold (1 500 000)
-        18: (None, False),  # Gold (750 000)
-        19: ("DyePack01Legendary", True),  # Dye‐pack
+        0: ("MountLockbox01L01", True, "mount"),  # Mount
+        1: ("Lockbox01L01", True, "pet"),  # Pet
+        # 2: ("GenericBrown", True, "egg"),  # Egg
+        # 3: ("CommonBrown", True, "egg"),  # Egg
+        # 4: ("OrdinaryBrown", True, "egg"),  # Egg
+        # 5: ("PlainBrown", True, "egg"),  # Egg
+        6: ("RarePetFood", True, "consumable"),  # Consumable
+        7: ("PetFood", True, "consumable"),  # Consumable
+        # 8: ("Lockbox01Gear", True, "gear"),  # Gear (will crash if invalid)
+        9: ("TripleFind", True, "charm"),  # Charm
+        10: ("DoubleFind1", True, "charm"),  # Charm
+        11: ("DoubleFind2", True, "charm"),  # Charm
+        12: ("DoubleFind3", True, "charm"),  # Charm
+        13: ("MajorLegendaryCatalyst", True, "consumable"),  # Consumable
+        14: ("MajorRareCatalyst", True, "consumable"),  # Consumable
+        15: ("MinorRareCatalyst", True, "consumable"),  # Consumable
+        16: (None, False, "gold", 3000000),  # Gold (3 000 000)
+        17: (None, False, "gold", 1500000),  # Gold (1 500 000)
+        18: (None, False, "gold", 750000),  # Gold (750 000)
+        19: ("Cheerocracy Pack Pink", True, "dye"),  # Valid Legendary Dye
     }
 
-    idx, (name, needs_str) = random.choice(list(reward_map.items()))
+    idx, reward_data = random.choice(list(reward_map.items()))
+    name = reward_data[0]
+    needs_str = reward_data[1]
+    reward_type = reward_data[2]
+    gold_amount = reward_data[3] if len(reward_data) > 3 else 0
+    
+    # Send visual packet to client
     bb = BitBuffer()
     bb.write_method_6(PACK_ID, CAT_BITS)
     bb.write_method_6(idx, ID_BITS)
@@ -437,7 +443,123 @@ def handle_lockbox_reward(session, data):
     packet = struct.pack(">HH", 0x108, len(payload)) + payload
     session.conn.sendall(packet)
 
-    print(f"Lockbox reward: idx={idx}, name={name}, needs_str={needs_str}")
+    print(f"Lockbox reward: idx={idx}, name={name}, type={reward_type}")
+    
+    # Actually grant the reward to the player
+    char = session.current_char_dict
+    if not char:
+        return
+        
+    save_needed = False
+    
+    # ALWAYS grant Royal Sigils when opening a lockbox (50-150 sigils)
+    sigil_reward = random.randint(50, 150)
+    current_sigils = int(char.get("SilverSigils", 0))  # Cast to int to avoid string comparison
+    char["SilverSigils"] = current_sigils + sigil_reward
+    
+    # Send Royal Sigil reward packet (0x112)
+    bb_sigil = BitBuffer()
+    bb_sigil.write_method_4(sigil_reward)
+    sigil_payload = bb_sigil.to_bytes()
+    sigil_packet = struct.pack(">HH", 0x112, len(sigil_payload)) + sigil_payload
+    session.conn.sendall(sigil_packet)
+    
+    save_needed = True
+    print(f"[Lockbox] {char.get('name', 'Unknown')} received {sigil_reward} Royal Sigils (total: {char['SilverSigils']})")
+    
+    if reward_type == "gold":
+        char["gold"] += gold_amount
+        send_gold_reward(session, gold_amount, show_fx=True)
+        save_needed = True
+        print(f"[Lockbox] {char['name']} received {gold_amount} Gold")
+        
+    elif reward_type == "consumable":
+        # Add consumable to inventory
+        from globals import send_consumable_reward
+        consumables = char.setdefault("consumables", [])
+        found = False
+        for entry in consumables:
+            if entry.get("consumableName") == name:
+                entry["count"] = int(entry.get("count", 0)) + 1
+                found = True
+                break
+        if not found:
+            consumables.append({"consumableName": name, "count": 1})
+        send_consumable_reward(session, name, 1)
+        save_needed = True
+        print(f"[Lockbox] {char['name']} received {name}")
+        
+    elif reward_type == "charm":
+        # Add charm to inventory
+        from globals import send_charm_reward
+        charms = char.setdefault("charms", [])
+        found = False
+        for entry in charms:
+            if entry.get("charmName") == name:
+                entry["count"] = int(entry.get("count", 0)) + 1
+                found = True
+                break
+        if not found:
+            charms.append({"charmName": name, "count": 1})
+        send_charm_reward(session, name)
+        save_needed = True
+        print(f"[Lockbox] {char['name']} received charm {name}")
+        
+    elif reward_type == "mount":
+        # Add mount to owned mounts
+        from globals import send_mount_reward
+        from constants import get_mount_id
+        
+        mount_id = get_mount_id(name)
+        
+        if mount_id != 0:
+            mounts = char.setdefault("mounts", [])
+            if mount_id not in mounts:
+                mounts.append(mount_id)
+                send_mount_reward(session, mount_id)
+                save_needed = True
+                print(f"[Lockbox] {char['name']} received mount {name} (ID: {mount_id})")
+        else:
+            print(f"[Lockbox] Warning: Unknown mount ID for {name}, skipping grant")
+            
+    elif reward_type == "pet":
+        # Add pet to owned pets (level 1)
+        pet_def = next((p for p in PET_TYPES if p.get("PetName") == name or p.get("PetID") == name), None)
+        if pet_def:
+            pet_type_id = pet_def["PetID"]
+            starting_rank = 1
+            
+            pets = char.get("pets", [])
+            special_id = max((p.get("special_id", 0) for p in pets), default=0) + 1
+            
+            new_pet = {
+                "typeID": pet_type_id,
+                "special_id": special_id,
+                "level": starting_rank,
+                "xp": 0,
+            }
+            
+            pets.append(new_pet)
+            char["pets"] = pets
+            
+            send_new_pet_packet(session, pet_type_id, special_id, starting_rank)
+            save_needed = True
+            print(f"[Lockbox] {char['name']} received pet {name}")
+
+        
+    elif reward_type == "dye":
+        # Add dye pack to inventory
+        from globals import send_dye_reward
+        dyes = char.setdefault("dyes", [])
+        if name not in dyes:
+            dyes.append(name)
+            send_dye_reward(session, name)
+            save_needed = True
+            print(f"[Lockbox] {char['name']} received dye {name}")
+    
+    if save_needed:
+        save_characters(session.user_id, session.char_list)
+
 
 
 def handle_hp_increase_notice(session, data):

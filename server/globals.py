@@ -269,6 +269,46 @@ def send_material_reward(session, material_id, amount=1, show_fx=True):
     session.conn.sendall(pkt)
     print(f"[{session.addr}] Sent material reward 0x34: mat={material_id}, amt={amount}")
 
+def send_consumable_reward(session, consumable_name, amount=1):
+    """Send consumable gain packet (0x10b)"""
+    bb = BitBuffer()
+    # Send consumable by name (client will look it up)
+    bb.write_method_13(consumable_name)
+    bb.write_method_4(amount)
+    bb.write_method_15(False)  # suppress notification
+    payload = bb.to_bytes()
+    pkt = struct.pack(">HH", 0x10b, len(payload)) + payload
+    session.conn.sendall(pkt)
+    print(f"[{session.addr}] Sent consumable reward: {consumable_name} x{amount}")
+
+def send_charm_reward(session, charm_name):
+    """Send charm gain packet (0x109)"""
+    bb = BitBuffer()
+    # Send charm by name (client will look it up)
+    bb.write_method_13(charm_name)
+    payload = bb.to_bytes()
+    pkt = struct.pack(">HH", 0x109, len(payload)) + payload
+    session.conn.sendall(pkt)
+    print(f"[{session.addr}] Sent charm reward: {charm_name}")
+
+def send_dye_reward(session, dye_name):
+    """Send dye unlock packet (0x10a)"""
+    bb = BitBuffer()
+    bb.write_method_13(dye_name)
+    payload = bb.to_bytes()
+    pkt = struct.pack(">HH", 0x10a, len(payload)) + payload
+    session.conn.sendall(pkt)
+    print(f"[{session.addr}] Sent dye reward: {dye_name}")
+
+def send_gold_loss(session, amount):
+    """Send gold loss packet (0xb4)"""
+    bb = BitBuffer()
+    bb.write_method_4(amount)
+    payload = bb.to_bytes()
+    pkt = struct.pack(">HH", 0xB4, len(payload)) + payload
+    session.conn.sendall(pkt)
+    print(f"[{session.addr}] Deducted {amount} gold")
+
 def send_hp_update(session, entity_id, delta):
     bb = BitBuffer()
     bb.write_method_4(entity_id)

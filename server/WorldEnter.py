@@ -79,11 +79,11 @@ def Player_Data_Packet(char: dict,
     # ──────────────(Numeric fields)──────────────
     char_level = char.get("level", 1) or 1
     buf.write_method_6(char_level, Entity.MAX_CHAR_LEVEL_BITS)
-    buf.write_method_4(char.get("xp", 0))
-    buf.write_method_4(char.get("gold", 0))
-    buf.write_method_4(char.get("craftXP", 0))
-    buf.write_method_4(char.get("DragonOre", 0))
-    buf.write_method_4(char.get("mammothIdols", 0))
+    buf.write_method_4(int(char.get("xp", 0)))
+    buf.write_method_4(int(char.get("gold", 0)))
+    buf.write_method_4(int(char.get("craftXP", 0)))
+    buf.write_method_4(int(char.get("DragonOre", 0)))
+    buf.write_method_4(int(char.get("mammothIdols", 0)))
 
 
 
@@ -231,8 +231,8 @@ def Player_Data_Packet(char: dict,
         buf.write_method_11(0, 1)
 
         # ──────────────(lockboxKeys) and (royalSigils)──────────────
-        buf.write_method_4(char.get("DragonKeys", 0))
-        buf.write_method_4(char.get("SilverSigils", 0))
+        buf.write_method_4(int(char.get("DragonKeys", 0)))
+        buf.write_method_4(int(char.get("SilverSigils", 0)))
 
         alert_state = char.get("alertState", 0)
         buf.write_method_6(alert_state, Game.const_646)
@@ -403,8 +403,8 @@ def Player_Data_Packet(char: dict,
         research = char.get("SkillResearch")
         if research:
             buf.write_method_11(1, 1)
-            buf.write_method_6(research["abilityID"], class_10.const_83)
-            end_sec = research.get("ReadyTime", 0)
+            buf.write_method_6(int(research["abilityID"]), class_10.const_83)
+            end_sec = int(research.get("ReadyTime", 0))
             if end_sec and end_sec <= now:
                 buf.write_method_4(0)
             else:
@@ -414,28 +414,28 @@ def Player_Data_Packet(char: dict,
 
         # ──────────────(buildingResearch)──────────────
         bu = char.get("buildingUpgrade", {})
-        ready_ts = bu.get("ReadyTime", 0)
-        has_building_upgrade = (isinstance(bu, dict) and bu.get("buildingID", 0) != 0 and is_in_progress(ready_ts))
+        ready_ts = int(bu.get("ReadyTime", 0))
+        has_building_upgrade = (isinstance(bu, dict) and int(bu.get("buildingID", 0)) != 0 and is_in_progress(ready_ts))
         buf.write_method_11(1 if has_building_upgrade else 0, 1)
         if has_building_upgrade:
-            buf.write_method_6(bu["buildingID"], class_9.const_129)
+            buf.write_method_6(int(bu["buildingID"]), class_9.const_129)
             buf.write_method_4(ready_ts)
 
         # ──────────────(towerResearch)──────────────
         tr = char.get("talentResearch", {})
-        ready_ts = tr.get("ReadyTime", 0)
+        ready_ts = int(tr.get("ReadyTime", 0))
         has_tr = (isinstance(tr, dict) and ready_ts > 0 and is_in_progress(ready_ts))
         buf.write_method_11(1 if has_tr else 0, 1)
         if has_tr:
-            buf.write_method_6(tr.get("classIndex", 0), class_66.const_571)
+            buf.write_method_6(int(tr.get("classIndex", 0)), class_66.const_571)
             buf.write_method_4(ready_ts)
 
         # ──────────────(EggHachery)──────────────
         egg_data = char.get("EggHachery", {})
 
         if egg_data and egg_data.get("EggID", 0) != 0:
-            egg_id = egg_data.get("EggID", 0)
-            ready_time = egg_data.get("ReadyTime", 0)
+            egg_id = int(egg_data.get("EggID", 0))
+            ready_time = int(egg_data.get("ReadyTime", 0))
             now = int(time.time())
 
             buf.write_method_11(1, 1)  # EggHachery exists
@@ -482,7 +482,7 @@ def Player_Data_Packet(char: dict,
             tp = tp_list[0]
             type_id = tp["typeID"]
             special_id = tp["special_id"]
-            ready_ts = tp.get("trainingTime", 0)
+            ready_ts = int(tp.get("trainingTime", 0))
             now = int(time.time())
 
             buf.write_method_11(1, 1)  # training exists
