@@ -3,7 +3,8 @@ import struct
 import time
 
 from BitBuffer import BitBuffer
-from constants import class_3, class_1, class_64, class_111, class_66, GearType, EGG_TYPES, class_16, class_7
+from constants import class_3, class_1, class_64, class_111, class_66, GearType, EGG_TYPES, class_16, class_7, class_21
+from constants import get_charm_id, get_consumable_id
 
 HOST = "127.0.0.1"
 PORTS = [8080]# Developer mode Port : 7498
@@ -138,7 +139,11 @@ def handle_entity_destroy_server(session, entity_id: int, all_sessions: list):
     # Send to everyone in same level
     for s in all_sessions:
         if s.player_spawned and s.current_level == session.current_level:
-            s.conn.sendall(pkt)
+            try:
+                s.conn.sendall(pkt)
+            except (ConnectionResetError, BrokenPipeError, OSError):
+                # Connection already closed, skip this session
+                pass
 
     #print(f"[EntityDestroy] Entity {entity_id} destroyed")
 
@@ -236,6 +241,7 @@ def send_mount_reward(session, mount_id, suppress=False):
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x36, len(payload)) + payload
     session.conn.sendall(pkt)
+    print(f"[{session.addr}] Sent mount reward 0x36: mount_id={mount_id}, suppress={suppress}")
 
 def send_gold_reward(session, amount, show_fx=False):
     bb = BitBuffer()
@@ -244,6 +250,7 @@ def send_gold_reward(session, amount, show_fx=False):
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x35, len(payload)) + payload
     session.conn.sendall(pkt)
+    print(f"[{session.addr}] Sent gold reward 0x35: amount={amount}, show_fx={show_fx}")
 
 def send_gear_reward(session, gear_id, tier=0, has_mods=False):
     bb = BitBuffer()
@@ -269,27 +276,60 @@ def send_material_reward(session, material_id, amount=1, show_fx=True):
     session.conn.sendall(pkt)
     print(f"[{session.addr}] Sent material reward 0x34: mat={material_id}, amt={amount}")
 
-def send_consumable_reward(session, consumable_name, amount=1):
-    """Send consumable gain packet (0x10b)"""
+def send_consumable_reward(session, consumable_name, amount=1, new_total=None):
+    """Send count update (0x10C) FIRST, then consumable gain packet (0x10b)
+    
+    Client's method_1779 expects:
+    - consumable_id: 5 bits (class_3.const_69)
+    - quantity: method_4 (variable length int)
+    - suppress: 1 bit (boolean)
+    """
+    consumable_id = get_consumable_id(consumable_name)
+    if consumable_id == 0:
+        print(f"[{session.addr}] Warning: Unknown consumable name '{consumable_name}'")
+        return
+    
+    # Calculate new_total if not provided
+    if new_total is None:
+        char = session.current_char_dict
+        new_total = 0
+        if char:
+            consumables = char.get("consumables", [])
+            for entry in consumables:
+                if entry.get("consumableID") == consumable_id:
+                    new_total = int(entry.get("count", 0))
+                    break
+    
+    # STEP 1: Send 0x10C to set the new inventory count FIRST
+    send_consumable_update(session.conn, consumable_id, new_total)
+    
+    # STEP 2: Send 0x10b notification packet with QUANTITY included
+    # Client expects: consumable_id (5 bits) + quantity (method_4) + suppress (1 bit)
     bb = BitBuffer()
-    # Send consumable by name (client will look it up)
-    bb.write_method_13(consumable_name)
-    bb.write_method_4(amount)
-    bb.write_method_15(False)  # suppress notification
+    bb.write_method_6(consumable_id, class_3.const_69)  # 5 bits for ID
+    bb.write_method_4(amount)  # quantity - THIS WAS MISSING!
+    bb.write_method_15(False)  # 1 bit - suppress notification (False = show it)
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x10b, len(payload)) + payload
     session.conn.sendall(pkt)
-    print(f"[{session.addr}] Sent consumable reward: {consumable_name} x{amount}")
+    
+    print(f"[{session.addr}] Sent consumable: {consumable_name} (ID:{consumable_id}) x{amount}, total: {new_total}")
 
 def send_charm_reward(session, charm_name):
     """Send charm gain packet (0x109)"""
+    charm_id = get_charm_id(charm_name)
+    if charm_id == 0:
+        print(f"[{session.addr}] Warning: Unknown charm name '{charm_name}'")
+        return
+    
     bb = BitBuffer()
-    # Send charm by name (client will look it up)
-    bb.write_method_13(charm_name)
+    # Client expects charm ID (16 bits as per class_64.const_101)
+    bb.write_method_6(charm_id, class_64.const_101)
+    bb.write_method_15(False)  # suppress notification
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x109, len(payload)) + payload
     session.conn.sendall(pkt)
-    print(f"[{session.addr}] Sent charm reward: {charm_name}")
+    print(f"[{session.addr}] Sent charm reward: {charm_name} (ID:{charm_id})")
 
 def send_dye_reward(session, dye_name):
     """Send dye unlock packet (0x10a)"""

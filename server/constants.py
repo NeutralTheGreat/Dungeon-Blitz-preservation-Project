@@ -362,6 +362,22 @@ def get_mount_id(name: str) -> int:
     return MOUNT_IDS.get(name, 0)
 
 
+def get_charm_id(charm_name: str) -> int:
+    """Get charm ID from charm name"""
+    for charm_id, charm in CHARM_DB.items():
+        if charm.get("CharmName") == charm_name:
+            return charm_id
+    return 0
+
+
+def get_consumable_id(consumable_name: str) -> int:
+    """Get consumable ID from consumable name"""
+    for c in CONSUMABLES:
+        if c.get("ConsumableName") == consumable_name:
+            return int(c.get("ConsumableID", 0))
+    return 0
+
+
 def load_class_template(class_name: str) -> dict:
     path = os.path.join("data", f"{class_name.lower()}_template.json")
     with open(path, "r", encoding="utf-8") as f:

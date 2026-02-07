@@ -474,20 +474,25 @@ def handle_lockbox_reward(session, data):
         print(f"[Lockbox] {char['name']} received {gold_amount} Gold")
         
     elif reward_type == "consumable":
-        # Add consumable to inventory
+        # Add consumable to inventory using consumableID for consistency
         from globals import send_consumable_reward
-        consumables = char.setdefault("consumables", [])
-        found = False
-        for entry in consumables:
-            if entry.get("consumableName") == name:
-                entry["count"] = int(entry.get("count", 0)) + 1
-                found = True
-                break
-        if not found:
-            consumables.append({"consumableName": name, "count": 1})
-        send_consumable_reward(session, name, 1)
-        save_needed = True
-        print(f"[Lockbox] {char['name']} received {name}")
+        from constants import get_consumable_id
+        consumable_id = get_consumable_id(name)
+        if consumable_id == 0:
+            print(f"[Lockbox] Warning: Unknown consumable '{name}'")
+        else:
+            consumables = char.setdefault("consumables", [])
+            found = False
+            for entry in consumables:
+                if entry.get("consumableID") == consumable_id:
+                    entry["count"] = int(entry.get("count", 0)) + 1
+                    found = True
+                    break
+            if not found:
+                consumables.append({"consumableID": consumable_id, "count": 1})
+            send_consumable_reward(session, name, 1)
+            save_needed = True
+            print(f"[Lockbox] {char['name']} received {name} (ID:{consumable_id})")
         
     elif reward_type == "charm":
         # Add charm to inventory
