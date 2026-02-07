@@ -283,11 +283,23 @@ def send_consumable_reward(session, consumable_name, amount=1, new_total=None):
     - consumable_id: 5 bits (class_3.const_69)
     - quantity: method_4 (variable length int)
     - suppress: 1 bit (boolean)
+    
+    IMPORTANT: Client's method_1202 DIVIDES quantity by 5000 for "Potion" type consumables!
+    So for Potion types, we must send amount * 5000 for correct display.
     """
+    from constants import CONSUMABLES
+    
     consumable_id = get_consumable_id(consumable_name)
     if consumable_id == 0:
         print(f"[{session.addr}] Warning: Unknown consumable name '{consumable_name}'")
         return
+    
+    # Look up consumable type to check if it's a "Potion"
+    consumable_type = None
+    for c in CONSUMABLES:
+        if c.get("ConsumableName") == consumable_name:
+            consumable_type = c.get("Type", "")
+            break
     
     # Calculate new_total if not provided
     if new_total is None:
@@ -305,15 +317,21 @@ def send_consumable_reward(session, consumable_name, amount=1, new_total=None):
     
     # STEP 2: Send 0x10b notification packet with QUANTITY included
     # Client expects: consumable_id (5 bits) + quantity (method_4) + suppress (1 bit)
+    # CRITICAL: For "Potion" type, client DIVIDES by 5000 in method_1202!
+    # So we must send amount * 5000 for Potion types.
+    display_amount = amount
+    if consumable_type == "Potion":
+        display_amount = amount * 5000  # Client will divide by 5000
+    
     bb = BitBuffer()
     bb.write_method_6(consumable_id, class_3.const_69)  # 5 bits for ID
-    bb.write_method_4(amount)  # quantity - THIS WAS MISSING!
+    bb.write_method_4(display_amount)  # quantity (multiplied for Potion types)
     bb.write_method_15(False)  # 1 bit - suppress notification (False = show it)
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x10b, len(payload)) + payload
     session.conn.sendall(pkt)
     
-    print(f"[{session.addr}] Sent consumable: {consumable_name} (ID:{consumable_id}) x{amount}, total: {new_total}")
+    print(f"[{session.addr}] Sent consumable: {consumable_name} (ID:{consumable_id}) x{amount}, display_amount={display_amount}, total: {new_total}")
 
 def send_charm_reward(session, charm_name):
     """Send charm gain packet (0x109)"""
