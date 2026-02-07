@@ -402,6 +402,32 @@ def handle_lockbox_reward(session, data):
     CAT_BITS = 3
     ID_BITS = 6
     PACK_ID = 1
+    
+    # All legendary dyes (rarity "L") from Game.swz.txt - using DyeName format (CamelCase)
+    # Client looks up dyes by DyeName, not DisplayName
+    LEGENDARY_DYES = [
+        "BroodMotherBlack",      # Brood Mother Black
+        "ClearcastPearl",        # Clearcast Pearl
+        "WizardWoolWhite",       # Wizard Wool White
+        "AstralObsidian",        # Astral Obsidian
+        "GleamingGold",          # Gleaming Gold
+        "ShiningSilver",         # Shining Silver
+        "MightyMammothIvory",    # Mighty Mammoth Ivory
+        "FieryPhoenixFeather",   # Fiery Phoenix Feather
+        "VelvetValkyries",       # Velvet Valkyries
+        "YearOfTheMammoth",      # Year Of The Mammoth
+        "CheerocracyPackPink",   # Cheerocracy Pack Pink
+        "ElegantEmerald",        # Elegant Emerald
+        "LeviathanLapisLazuli",  # Leviathan Lapis Lazuli
+        "AlluringAmethyst",      # Alluring Amethyst
+        "SparklingTourmaline",   # Sparkling Tourmaline
+        "DragonCoatRed",         # Dragon Coat Red
+        "IridescentOpal",        # Iridescent Opal
+        "HailToTheForest",       # Hail To The Forest
+        "BrokenHeartBlack",      # Broken Heart Black
+        "FrostlordSatin",        # Frostlord Satin
+    ]
+    
     reward_map = {
         0: ("MountLockbox01L01", True, "mount"),  # Mount
         1: ("Lockbox01L01", True, "pet"),  # Pet
@@ -422,10 +448,15 @@ def handle_lockbox_reward(session, data):
         16: (None, False, "gold", 3000000),  # Gold (3 000 000)
         17: (None, False, "gold", 1500000),  # Gold (1 500 000)
         18: (None, False, "gold", 750000),  # Gold (750 000)
-        19: ("Cheerocracy Pack Pink", True, "dye"),  # Valid Legendary Dye
+        19: (None, True, "dye"),  # Legendary Dye - actual dye name selected below
     }
 
     idx, reward_data = random.choice(list(reward_map.items()))
+    
+    # For dye rewards, select a random legendary dye
+    if reward_data[2] == "dye":
+        selected_dye = random.choice(LEGENDARY_DYES)
+        reward_data = (selected_dye, True, "dye")
     name = reward_data[0]
     needs_str = reward_data[1]
     reward_type = reward_data[2]
@@ -433,8 +464,16 @@ def handle_lockbox_reward(session, data):
     
     # Send visual packet to client
     bb = BitBuffer()
-    bb.write_method_6(PACK_ID, CAT_BITS)
-    bb.write_method_6(idx, ID_BITS)
+    
+    # For dye rewards, use DyePack01Legendary (pack ID 4, idx 0) which has RewardType=Dye
+    # This ensures the client renders the actual dye color icon instead of generic "Top Tier Dyes"
+    if reward_type == "dye":
+        bb.write_method_6(4, CAT_BITS)  # DyePack01Legendary = pack ID 4
+        bb.write_method_6(0, ID_BITS)   # First entry in the pack
+    else:
+        bb.write_method_6(PACK_ID, CAT_BITS)
+        bb.write_method_6(idx, ID_BITS)
+    
     bb.write_method_6(1 if needs_str else 0, 1)
     if needs_str:
         bb.write_method_13(name)
