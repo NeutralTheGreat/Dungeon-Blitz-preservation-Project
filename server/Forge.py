@@ -178,20 +178,50 @@ def pick_secondary_rune(
     chance_any = base_chance_any + rare_bonus
     chance_legendary = base_chance_legendary + legend_bonus
 
+    # If legendary chance is >= 100%, guarantee secondary as well
+    # (Heart of the Furnace gives 100% legendary, so must guarantee secondary)
+    if chance_legendary >= 100.0:
+        chance_any = 100.0
+
     # Clamp to 100%
     chance_any = min(chance_any, 100.0)
     chance_legendary = min(chance_legendary, 100.0)
 
-    #print(f"[Forge RNG] mats={materials_used} → pts={total_points}, "
-    #      f"Anvil Points+{craft_level} → chance_any={chance_any:.1f}%, "
-    #      f"chance_legendary={chance_legendary:.1f}%")
+    print(f"[Forge RNG] chance_any={chance_any:.1f}%, chance_legendary={chance_legendary:.1f}%")
 
     has_secondary = (random.random() * 100) < chance_any
     if not has_secondary:
         return 0, 0
 
     var_8 = 2 if (random.random() * 100) < chance_legendary else 1
-    secondary_id = random.randint(1, 9)
+    
+    # Get the primary charm's type to exclude from secondary options
+    # Secondary IDs: 1=Trog(ItemDrop), 2=Infernal(ProcChance), 3=Undead(GoldDrop), 
+    #                4=Mythic(CraftDrop), 5=Draconic(PowerBonus), 6=Sylvan(HitPoints),
+    #                7=Melee, 8=Magic, 9=Armor
+    PRIMARY_TYPE_TO_SECONDARY = {
+        "Trog": 1,       # Gear Finding (ItemDrop)
+        "Infernal": 2,   # Proc Chance
+        "Undead": 3,     # Gold Finding
+        "Mythic": 4,     # Material Finding (CraftDrop)
+        "Draconic": 5,   # Power Bonus
+        "Sylvan": 6,     # Hit Points
+        "Melee": 7,      # Melee Damage
+        "Magic": 8,      # Magic Damage
+        "Armor": 9,      # Armor
+    }
+    
+    # Look up the primary charm's type
+    charm_entry = CHARM_DB.get(int(primary_id))
+    excluded_secondary = 0
+    if charm_entry:
+        primary_type = charm_entry.get("PrimaryType", "")
+        excluded_secondary = PRIMARY_TYPE_TO_SECONDARY.get(primary_type, 0)
+    
+    # Pick a secondary that doesn't match the primary stat
+    possible_secondaries = [i for i in range(1, 10) if i != excluded_secondary]
+    secondary_id = random.choice(possible_secondaries)
+    
     return secondary_id, var_8
 
 #             Forge Function Handlers
@@ -427,10 +457,30 @@ def handle_allocate_magic_forge_artisan_skill_points(session, data):
     char["craftTalentPoints"] = points
     save_characters(session.user_id, session.char_list)
 
-def pick_unused_property(usedlist: int, primary: int) -> int | None:
+def pick_unused_property(usedlist: int, primary_charm_id: int) -> int | None:
+    # Map PrimaryType to secondary ID
+    PRIMARY_TYPE_TO_SECONDARY = {
+        "Trog": 1,       # Gear Finding (ItemDrop)
+        "Infernal": 2,   # Proc Chance
+        "Undead": 3,     # Gold Finding
+        "Mythic": 4,     # Material Finding (CraftDrop)
+        "Draconic": 5,   # Power Bonus
+        "Sylvan": 6,     # Hit Points
+        "Melee": 7,      # Melee Damage
+        "Magic": 8,      # Magic Damage
+        "Armor": 9,      # Armor
+    }
+    
+    # Get the primary charm's type to exclude
+    charm_entry = CHARM_DB.get(int(primary_charm_id))
+    excluded_secondary = 0
+    if charm_entry:
+        primary_type = charm_entry.get("PrimaryType", "")
+        excluded_secondary = PRIMARY_TYPE_TO_SECONDARY.get(primary_type, 0)
 
     for realm_id in range(1, 10):
-        if realm_id == primary:
+        # Skip the one that matches the charm's primary stat type
+        if realm_id == excluded_secondary:
             continue
 
         bit = 1 << (realm_id - 1)
@@ -462,7 +512,9 @@ def handle_magic_forge_reroll(session, data):
     if not new_secondary:
         return
 
-    new_tier = random.choice([1, 2])
+    # Preserve the original tier (Rare/Legendary) - don't randomize it!
+    original_tier = int(mf.get("secondary_tier", 1))
+    new_tier = original_tier if original_tier > 0 else 1
     server_usedlist |= (1 << (new_secondary - 1))
 
     mf.update({

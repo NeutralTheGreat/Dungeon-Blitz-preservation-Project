@@ -9,6 +9,9 @@
     "mammothIdols": 100000,
     "DragonKeys": 100000,
     "SilverSigils": 100000,
+    "consumables": [
+        {"consumableID": 4, "count": 999}
+    ],
     "alertState": 15,
     "gender": "Male",
     "headSet": "Short",

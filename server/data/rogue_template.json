@@ -9,6 +9,12 @@
     "mammothIdols": 100000,
     "DragonKeys": 100000,
     "SilverSigils": 100000,
+    "consumables": [
+        {
+            "consumableID": 4,
+            "count": 999
+        }
+    ],
     "alertState": 15,
     "gender": "Female",
     "headSet": "FemaleHead02",
@@ -8867,25 +8873,25 @@
     "activeEggCount": 5,
     "restingPets": [
         {
-          "typeID": 0,
-          "special_id": 0
+            "typeID": 0,
+            "special_id": 0
         },
         {
-          "typeID": 0,
-          "special_id": 0
+            "typeID": 0,
+            "special_id": 0
         },
         {
-          "typeID": 0,
-          "special_id": 0
+            "typeID": 0,
+            "special_id": 0
         }
-      ],
-      "trainingPet": [
+    ],
+    "trainingPet": [
         {
-          "typeID": 0,
-          "special_id": 0,
-          "trainingTime": 0
+            "typeID": 0,
+            "special_id": 0,
+            "trainingTime": 0
         }
-      ],
+    ],
     "MasterClass": 3,
     "TalentTree": {
         "1": {
@@ -9310,7 +9316,7 @@
     "activePet": {
         "typeID": 1,
         "special_id": 0
-      },
+    },
     "activeConsumableID": 13,
     "queuedConsumableID": 12,
     "guild": {
