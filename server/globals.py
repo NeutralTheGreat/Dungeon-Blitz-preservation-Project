@@ -235,28 +235,53 @@ def send_deduct_sigils(session, amount):
     session.conn.sendall(pkt)
 
 def send_mount_reward(session, mount_id, suppress=False):
+    """Send mount reward packet (0x36)
+    
+    Args:
+        session: Player session
+        mount_id: The mount ID to grant
+        suppress: If False (default), show NEW notification. If True, suppress it.
+    """
     bb = BitBuffer()
     bb.write_method_4(mount_id)
-    bb.write_method_11(1 if suppress else 0, 1)
+    bb.write_method_15(suppress)  # False = show notification, True = suppress
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x36, len(payload)) + payload
     session.conn.sendall(pkt)
     print(f"[{session.addr}] Sent mount reward 0x36: mount_id={mount_id}, suppress={suppress}")
 
-def send_gold_reward(session, amount, show_fx=False):
+def send_gold_reward(session, amount, suppress=True):
+    """Send gold reward packet (0x35)
+    
+    Args:
+        session: Player session
+        amount: Gold amount to add
+        suppress: If False, show NEW notification in bottom-left panel. 
+                  If True (default), just update gold counter silently.
+    
+    Note: Client reads amount via method_4() and suppress flag via method_11().
+    """
     bb = BitBuffer()
     bb.write_method_4(amount)
-    bb.write_method_11(1 if show_fx else 0, 1)
+    bb.write_method_15(suppress)  # False = show notification, True = suppress
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x35, len(payload)) + payload
     session.conn.sendall(pkt)
-    print(f"[{session.addr}] Sent gold reward 0x35: amount={amount}, show_fx={show_fx}")
+    print(f"[{session.addr}] Sent gold reward 0x35: amount={amount}, suppress={suppress}")
+
+
+
 
 def send_gear_reward(session, gear_id, tier=0, has_mods=False):
+    """Send gear reward packet (0x33)
+    
+    Note: Client expects gear_id and tier only.
+    The has_mods parameter is kept for API compatibility but not sent to client.
+    """
     bb = BitBuffer()
     bb.write_method_6(gear_id, GearType.GEARTYPE_BITSTOSEND)
     bb.write_method_6(tier, GearType.const_176)
-    bb.write_method_11(1 if has_mods else 0, 1)
+    # NOTE: Do NOT add extra bits here - client only expects gear_id and tier
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x33, len(payload)) + payload
     session.conn.sendall(pkt)
@@ -349,14 +374,21 @@ def send_charm_reward(session, charm_name):
     session.conn.sendall(pkt)
     print(f"[{session.addr}] Sent charm reward: {charm_name} (ID:{charm_id})")
 
-def send_dye_reward(session, dye_name):
-    """Send dye unlock packet (0x10a)"""
+def send_dye_reward(session, dye_name, suppress=False):
+    """Send dye unlock packet (0x10a)
+    
+    Args:
+        session: Player session
+        dye_name: The dye name to unlock (CamelCase format)
+        suppress: If False (default), show NEW notification. If True, suppress it.
+    """
     bb = BitBuffer()
     bb.write_method_13(dye_name)
+    bb.write_method_15(suppress)  # False = show notification, True = suppress
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x10a, len(payload)) + payload
     session.conn.sendall(pkt)
-    print(f"[{session.addr}] Sent dye reward: {dye_name}")
+    print(f"[{session.addr}] Sent dye reward: {dye_name}, suppress={suppress}")
 
 def send_gold_loss(session, amount):
     """Send gold loss packet (0xb4)"""
@@ -443,18 +475,27 @@ def send_egg_hatch_start(session):
 
     print(f"[EGG] Sent hatch-start packet for egg {egg_id}")
 
-def send_new_pet_packet(session, type_id, special_id, rank):
+def send_new_pet_packet(session, type_id, special_id, rank, suppress=False):
+    """Send new pet packet (0x37)
+    
+    Args:
+        session: Player session
+        type_id: Pet type ID
+        special_id: Pet special/instance ID
+        rank: Pet rank/level
+        suppress: If False (default), show NEW notification. If True, suppress it.
+    """
     bb = BitBuffer()
     bb.write_method_6(type_id, class_7.const_19)
     bb.write_method_4(special_id)
     bb.write_method_6(rank, class_7.const_75)
-    bb.write_method_15(True)  # isNew = true
+    bb.write_method_15(suppress)  # False = show notification, True = suppress (same as mount/dye)
 
     body = bb.to_bytes()
     pkt = struct.pack(">HH", 0x37, len(body)) + body
     session.conn.sendall(pkt)
 
-    print(f"[PET] Sent NEW PET : type={type_id}, special_id={special_id}, rank={rank}")
+    print(f"[PET] Sent NEW PET : type={type_id}, special_id={special_id}, rank={rank}, suppress={suppress}")
 
 def send_server_shutdown_warning(seconds):
     bb = BitBuffer()
