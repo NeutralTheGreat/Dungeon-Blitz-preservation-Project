@@ -341,6 +341,22 @@ CONSUMABLE_BOOSTS = {
 def get_dye_color(dye_id: int | str):
     return DYE_DATA.get(str(dye_id), {}).get("color")
 
+def get_dye_id(dye_name: str) -> int:
+    """Get dye ID from dye name (CamelCase format like 'WizardWoolWhite')
+    
+    The DYE_DATA stores display names with spaces like 'Wizard Wool White',
+    so we need to compare by removing spaces from both sides.
+    """
+    # Normalize input by removing spaces
+    normalized_input = dye_name.replace(" ", "").lower()
+    
+    for dye_id, dye_info in DYE_DATA.items():
+        # Normalize the stored name the same way
+        stored_name = dye_info.get("name", "").replace(" ", "").lower()
+        if stored_name == normalized_input:
+            return int(dye_id)
+    return 0
+
 def get_ability_info(ability_id: int, rank: int):
     key, rank = str(ability_id), str(rank)
     for e in ABILITY_DATA:

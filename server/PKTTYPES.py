@@ -9,7 +9,8 @@ from globals import Client_Crash_Reports
 
 from Commands import handle_badge_request, handle_linkupdater, handle_talk_to_npc, handle_lockbox_reward, \
     handle_queue_potion, handle_hp_increase_notice, handle_grant_reward, handle_power_use, handle_pickup_lootdrop, \
-    handle_set_level_complete, handle_send_combat_stats, handle_dungeon_run_report
+    handle_set_level_complete, handle_send_combat_stats, handle_dungeon_run_report, handle_buy_treasure_trove, \
+    handle_buy_lockbox_keys
 from Forge import handle_start_forge, handle_forge_speed_up_packet, handle_collect_forge_charm, handle_cancel_forge, handle_use_forge_xp_consumable, handle_allocate_magic_forge_artisan_skill_points, handle_magic_forge_reroll
 from buildings import handle_building_upgrade, handle_building_speed_up_request, handle_cancel_building_upgrade, handle_building_claim
 from combat import handle_entity_destroy, handle_buff_tick_dot, handle_respawn_broadcast, handle_request_respawn, handle_power_hit, handle_projectile_explode, handle_add_buff, handle_remove_buff, handle_change_max_speed, handle_power_cast, handle_change_offset_y, handle_char_regen, handle_char_regen_tick, handle_equip_rune, handle_update_equipment, handle_update_single_gear, handle_create_gearset, handle_name_gearset, handle_update_gearset
@@ -556,6 +557,8 @@ PACKET_HANDLERS = {
     0x3f:   handle_set_level_complete,
     0xfc :  handle_send_combat_stats,
     0xC4 :  handle_dungeon_run_report,
+    0x114:  handle_buy_treasure_trove,  # Treasure Trove purchase
+    0x105:  handle_buy_lockbox_keys,  # Buy Lockbox Keys with Mammoth Idols
     ############################################
 
      # other

@@ -193,7 +193,7 @@ def handle_pickup_lootdrop(session, data):
         if "gold" in loot:
             amount = loot["gold"]
             char["gold"] += amount
-            send_gold_reward(session, amount, show_fx=False)
+            send_gold_reward(session, amount)
             save_needed = True
             print(f"[Loot] {char['name']} picked up {amount} Gold.")
 
@@ -429,8 +429,8 @@ def handle_lockbox_reward(session, data):
     ]
     
     reward_map = {
-        0: ("MountLockbox01L01", True, "mount"),  # Mount
-        1: ("Lockbox01L01", True, "pet"),  # Pet
+        0: ("MountLockbox01L01", True, "mount"),  # Mount (Ivorstorm Guardian)
+        1: ("Lockbox01L01", True, "pet"),  # Pet (Darkheart Apparition)
         # 2: ("GenericBrown", True, "egg"),  # Egg
         # 3: ("CommonBrown", True, "egg"),  # Egg
         # 4: ("OrdinaryBrown", True, "egg"),  # Egg
@@ -445,9 +445,9 @@ def handle_lockbox_reward(session, data):
         13: ("MajorLegendaryCatalyst", True, "consumable"),  # Consumable
         14: ("MajorRareCatalyst", True, "consumable"),  # Consumable
         15: ("MinorRareCatalyst", True, "consumable"),  # Consumable
-        16: (None, False, "gold", 3000000),  # Gold (3 000 000)
-        17: (None, False, "gold", 1500000),  # Gold (1 500 000)
-        18: (None, False, "gold", 750000),  # Gold (750 000)
+        16: ("3,000,000 Gold", True, "gold", 3000000),  # Gold (3 000 000)
+        17: ("1,500,000 Gold", True, "gold", 1500000),  # Gold (1 500 000)
+        18: ("750,000 Gold", True, "gold", 750000),  # Gold (750 000)
         19: (None, True, "dye"),  # Legendary Dye - actual dye name selected below
     }
 
@@ -457,6 +457,7 @@ def handle_lockbox_reward(session, data):
     if reward_data[2] == "dye":
         selected_dye = random.choice(LEGENDARY_DYES)
         reward_data = (selected_dye, True, "dye")
+        
     name = reward_data[0]
     needs_str = reward_data[1]
     reward_type = reward_data[2]
@@ -491,6 +492,7 @@ def handle_lockbox_reward(session, data):
         
     save_needed = False
     
+    
     # ALWAYS grant Royal Sigils when opening a lockbox (50-150 sigils)
     sigil_reward = random.randint(50, 150)
     current_sigils = int(char.get("SilverSigils", 0))  # Cast to int to avoid string comparison
@@ -508,7 +510,7 @@ def handle_lockbox_reward(session, data):
     
     if reward_type == "gold":
         char["gold"] += gold_amount
-        send_gold_reward(session, gold_amount, show_fx=True)
+        send_gold_reward(session, gold_amount, suppress=False)  # Show NEW notification
         save_needed = True
         print(f"[Lockbox] {char['name']} received {gold_amount} Gold")
         
@@ -555,14 +557,21 @@ def handle_lockbox_reward(session, data):
         from constants import get_mount_id
         
         mount_id = get_mount_id(name)
+        print(f"[Lockbox DEBUG] Mount lookup: name='{name}' -> mount_id={mount_id}")
         
         if mount_id != 0:
             mounts = char.setdefault("mounts", [])
+            print(f"[Lockbox DEBUG] Current mounts: {mounts}")
+            
             if mount_id not in mounts:
                 mounts.append(mount_id)
-                send_mount_reward(session, mount_id)
                 save_needed = True
-                print(f"[Lockbox] {char['name']} received mount {name} (ID: {mount_id})")
+                print(f"[Lockbox] {char['name']} received NEW mount {name} (ID: {mount_id})")
+            else:
+                print(f"[Lockbox] {char['name']} already owns mount {name} (ID: {mount_id})")
+            
+            # Always send notification for lockbox rewards (suppress=False)
+            send_mount_reward(session, mount_id, suppress=False)
         else:
             print(f"[Lockbox] Warning: Unknown mount ID for {name}, skipping grant")
             
@@ -586,24 +595,216 @@ def handle_lockbox_reward(session, data):
             pets.append(new_pet)
             char["pets"] = pets
             
-            send_new_pet_packet(session, pet_type_id, special_id, starting_rank)
+            # Send pet notification with suppress=False to show NEW in bottom-left panel
+            send_new_pet_packet(session, pet_type_id, special_id, starting_rank, suppress=False)
             save_needed = True
             print(f"[Lockbox] {char['name']} received pet {name}")
+        else:
+            print(f"[Lockbox] Warning: Pet definition not found for '{name}'")
 
-        
     elif reward_type == "dye":
-        # Add dye pack to inventory
+        # Add dye to OwnedDyes using integer ID (not string name)
         from globals import send_dye_reward
-        dyes = char.setdefault("dyes", [])
-        if name not in dyes:
-            dyes.append(name)
-            send_dye_reward(session, name)
-            save_needed = True
-            print(f"[Lockbox] {char['name']} received dye {name}")
+        from constants import get_dye_id
+        
+        dye_id = get_dye_id(name)
+        if dye_id == 0:
+            print(f"[Lockbox] Warning: Unknown dye ID for '{name}'")
+        else:
+            owned_dyes = char.setdefault("OwnedDyes", [])
+            if dye_id not in owned_dyes:
+                owned_dyes.append(dye_id)
+                send_dye_reward(session, name, suppress=False)  # Show NEW notification
+                save_needed = True
+                print(f"[Lockbox] {char['name']} received dye {name} (ID: {dye_id})")
+            else:
+                print(f"[Lockbox] {char['name']} already owns dye {name} (ID: {dye_id})")
     
     if save_needed:
         save_characters(session.user_id, session.char_list)
 
+
+def handle_buy_treasure_trove(session, data):
+    """
+    Handle the 0x114 packet for buying treasure troves.
+    Payload contains a single byte indicating the purchase option.
+    Options: x1 = 50,000 gold, x10 = 375,000 gold, x25 = 625,000 gold
+    """
+    raw_payload = data[4:]
+    print(f"[BuyTrove DEBUG] Raw payload length: {len(raw_payload)} bytes")
+    if raw_payload:
+        # Print all bits for analysis
+        all_bits = ''.join(format(b, '08b') for b in raw_payload)
+        print(f"[BuyTrove DEBUG] Raw bits: {all_bits}")
+        print(f"[BuyTrove DEBUG] Raw hex: {raw_payload.hex()}")
+    
+    br = BitReader(raw_payload)
+    
+    # Try different reading strategies to understand the packet format
+    # Strategy 1: Read first 8 bits as raw value
+    if len(raw_payload) >= 1:
+        first_byte = raw_payload[0]
+        print(f"[BuyTrove DEBUG] First byte value: {first_byte}")
+    
+    # Read lockbox_id (2 bits)
+    lockbox_id = br.read_method_6(2)
+    print(f"[BuyTrove DEBUG] lockbox_id={lockbox_id} (2 bits), remaining: {br.remaining_bits()}")
+    
+    # Try reading option with method_4 (variable length) instead of fixed 2 bits
+    option_index = br.read_method_4()
+    print(f"[BuyTrove DEBUG] option_index={option_index} (method_4)")
+    
+    print(f"[BuyTrove] Received: lockbox_id={lockbox_id}, option_index={option_index}")
+    
+    # Define costs and quantities
+    TROVE_OPTIONS = {
+        0: {"quantity": 1, "cost": 50000},
+        1: {"quantity": 10, "cost": 375000},
+        2: {"quantity": 25, "cost": 625000},
+    }
+    
+    if option_index not in TROVE_OPTIONS:
+        print(f"[BuyTrove] Invalid option index: {option_index}")
+        return
+    
+    option = TROVE_OPTIONS[option_index]
+    quantity = option["quantity"]
+    cost = option["cost"]
+    
+    char = session.current_char_dict
+    if not char:
+        print("[BuyTrove] No character data found")
+        return
+    
+    current_gold = int(char.get("gold", 0))
+    
+    if current_gold < cost:
+        print(f"[BuyTrove] Not enough gold: {current_gold} < {cost}")
+        return
+    
+    # Deduct gold
+    char["gold"] = current_gold - cost
+    
+    # Add treasure troves (lockboxID = 1 for standard treasure trove)
+    TROVE_LOCKBOX_ID = 1
+    lockboxes = char.setdefault("lockboxes", [])
+    
+    # Find existing lockbox entry or create new one
+    found = False
+    for box in lockboxes:
+        if box.get("lockboxID") == TROVE_LOCKBOX_ID:
+            box["count"] = int(box.get("count", 0)) + quantity
+            found = True
+            break
+    
+    if not found:
+        lockboxes.append({"lockboxID": TROVE_LOCKBOX_ID, "count": quantity})
+    
+    # Save character data
+    save_characters(session.user_id, session.char_list)
+    
+    # Send gold loss notification to client (packet 0xB4)
+    bb = BitBuffer()
+    bb.write_method_4(cost)
+    payload = bb.to_bytes()
+    packet = struct.pack(">HH", 0xB4, len(payload)) + payload
+    session.conn.sendall(packet)
+    
+    # Send lockbox inventory update to client (packet 0x104)
+    # Client reads: method_6(class_15.const_300) = 2 bits for lockbox ID
+    #              method_4() for count (this is the DELTA to add, not total!)
+    #              method_11() for boolean flag (show notification)
+    bb_lockbox = BitBuffer()
+    bb_lockbox.write_method_6(TROVE_LOCKBOX_ID, 2)  # 2 bits for lockbox ID
+    # Send the quantity purchased (delta), NOT the total count
+    # Client adds this value to its local count
+    bb_lockbox.write_method_4(quantity)
+    bb_lockbox.write_method_11(1, 1)  # Show notification = true
+    lockbox_payload = bb_lockbox.to_bytes()
+    lockbox_packet = struct.pack(">HH", 0x104, len(lockbox_payload)) + lockbox_payload
+    session.conn.sendall(lockbox_packet)
+    
+    # Calculate new total for logging
+    new_count = 0
+    for box in lockboxes:
+        if box.get("lockboxID") == TROVE_LOCKBOX_ID:
+            new_count = int(box.get("count", 0))
+            break
+    
+    print(f"[BuyTrove] {char.get('name', 'Unknown')} purchased {quantity} treasure trove(s) for {cost} gold (new total: {new_count})")
+
+
+def handle_buy_lockbox_keys(session, data):
+    """
+    Handle the 0x105 packet for buying lockbox keys with Mammoth Idols.
+    Client sends: method_9(option_index) ONLY - no lockbox_id!
+    Client adds keys locally and expects NO response packet.
+    Options from const_356 = [1, 10, 25], costs from const_1059 = [22, 210, 470]
+    """
+    raw_payload = data[4:]
+    print(f"[BuyKeys DEBUG] Raw payload length: {len(raw_payload)} bytes")
+    if raw_payload:
+        all_bits = ''.join(format(b, '08b') for b in raw_payload)
+        print(f"[BuyKeys DEBUG] Raw bits: {all_bits}")
+    
+    br = BitReader(raw_payload)
+    
+    # Client sends ONLY option_index via method_9 (4-bit prefix + variable value)
+    # NOT lockbox_id + option_index as previously assumed
+    option_index = br.read_method_9()
+    print(f"[BuyKeys DEBUG] option_index={option_index}")
+    
+    # Define costs and quantities for keys
+    # From class_131.txt: const_356 = [1, 10, 25], const_1059 = [22, 210, 470]
+    KEY_OPTIONS = {
+        0: {"quantity": 1, "cost": 22},
+        1: {"quantity": 10, "cost": 210},
+        2: {"quantity": 25, "cost": 470},
+    }
+    
+    if option_index not in KEY_OPTIONS:
+        print(f"[BuyKeys] Invalid option index: {option_index}")
+        return
+    
+    option = KEY_OPTIONS[option_index]
+    quantity = option["quantity"]
+    cost = option["cost"]
+    
+    char = session.current_char_dict
+    if not char:
+        print("[BuyKeys] No character data found")
+        return
+    
+    current_idols = int(char.get("mammothIdols", 0))
+    
+    if current_idols < cost:
+        print(f"[BuyKeys] Not enough Mammoth Idols: {current_idols} < {cost}")
+        return
+    
+    # Deduct Mammoth Idols
+    char["mammothIdols"] = current_idols - cost
+    
+    # Add Dragon Keys
+    current_keys = int(char.get("DragonKeys", 0))
+    char["DragonKeys"] = current_keys + quantity
+    
+    # Save character data
+    save_characters(session.user_id, session.char_list)
+    
+    # Send Mammoth Idols deduction to client (packet 0xB5)
+    # Client's method_1000 reads:
+    #   1. method_13() - purchase name string
+    #   2. method_4() - cost to deduct
+    # Then: this.var_1.mMammothIdols -= cost
+    bb_idols = BitBuffer()
+    bb_idols.write_method_13(f"DragonKeys_x{quantity}")  # Purchase name string
+    bb_idols.write_method_4(cost)  # Cost to deduct from idols
+    idols_payload = bb_idols.to_bytes()
+    idols_packet = struct.pack(">HH", 0xB5, len(idols_payload)) + idols_payload
+    session.conn.sendall(idols_packet)
+    
+    print(f"[BuyKeys] {char.get('name', 'Unknown')} purchased {quantity} key(s) for {cost} Mammoth Idols")
+    print(f"[BuyKeys] New totals - Keys: {char['DragonKeys']}, Idols: {char['mammothIdols']}")
 
 
 def handle_hp_increase_notice(session, data):
