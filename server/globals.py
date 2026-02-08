@@ -456,6 +456,22 @@ def send_new_pet_packet(session, type_id, special_id, rank):
 
     print(f"[PET] Sent NEW PET : type={type_id}, special_id={special_id}, rank={rank}")
 
+def send_pet_xp_update(session, type_id: int, special_id: int, new_xp: int, new_level: int, leveled_up: bool = False):
+    """
+    Send pet XP update packet (0xf2)
+    Client expects only a single 32-bit XP value
+    The client's method_1816 reads: param1.method_4() -> XP value
+    Then calls mEggPetInfo.method_1937(xp) to update the active pet's XP
+    """
+    bb = BitBuffer()
+    bb.write_method_4(new_xp)  # Only XP value - client reads this with method_4()
+
+    body = bb.to_bytes()
+    pkt = struct.pack(">HH", 0xF2, len(body)) + body
+    session.conn.sendall(pkt)
+
+    print(f"[PET] XP Update: type={type_id}, special={special_id}, xp={new_xp}, level={new_level}, leveled={leveled_up}")
+
 def send_server_shutdown_warning(seconds):
     bb = BitBuffer()
     bb.write_method_4(seconds)

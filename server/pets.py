@@ -2,10 +2,49 @@ import time
 
 from accounts import save_characters
 from bitreader import BitReader
-from constants import class_20, class_7, class_16, Game, EGG_TYPES, PET_TYPES
+from constants import class_20, class_7, class_16, Game, EGG_TYPES, PET_TYPES, class_3, CONSUMABLES
 from globals import build_hatchery_packet, pick_daily_eggs, send_premium_purchase, send_pet_training_complete, \
-    send_egg_hatch_start, send_new_pet_packet, GS
+    send_egg_hatch_start, send_new_pet_packet, GS, send_pet_xp_update, send_consumable_update
 from scheduler import schedule_pet_training, schedule_egg_hatch
+
+# Pet XP thresholds for levels 1-20 (from official game values)
+PET_XP_THRESHOLDS = [
+    0,       # Level 1 (starting level)
+    4000,    # Level 2
+    12500,   # Level 3
+    24200,   # Level 4
+    39400,   # Level 5
+    57300,   # Level 6
+    78800,   # Level 7
+    103200,  # Level 8
+    130100,  # Level 9
+    158800,  # Level 10
+    192100,  # Level 11
+    229000,  # Level 12
+    272100,  # Level 13
+    320300,  # Level 14
+    375500,  # Level 15
+    434600,  # Level 16
+    501100,  # Level 17
+    573800,  # Level 18
+    605300,  # Level 19
+    744100,  # Level 20 (max)
+]
+
+def get_xp_for_level(level: int) -> int:
+    """Get XP threshold for a given level"""
+    if level <= 1:
+        return 0
+    if level > len(PET_XP_THRESHOLDS):
+        return PET_XP_THRESHOLDS[-1]
+    return PET_XP_THRESHOLDS[level - 1]
+
+def get_level_for_xp(xp: int) -> int:
+    """Get the level for a given XP amount"""
+    for i, threshold in enumerate(PET_XP_THRESHOLDS):
+        if xp < threshold:
+            return i  # Return the previous level (1-indexed)
+    return len(PET_XP_THRESHOLDS)  # Max level
 
 
 # Helpers
@@ -356,3 +395,134 @@ def handle_cancel_egg_hatch(session, data):
     char["activeEggCount"] = 0
 
     save_characters(session.user_id, session.char_list)
+
+def handle_use_pet_food(session, data):
+    """
+    Handle pet food usage
+    ConsumableID 10 = RarePetFood (Arcane Chew Bone) - 60000 XP + 1 level
+    ConsumableID 11 = PetFood (Savory Steak) - 30000 XP
+    
+    NOTE: Client only sends consumable ID, not pet info.
+    The food is always applied to the currently active pet.
+    """
+    br = BitReader(data[4:])
+    
+    # Read the consumable ID (client only sends this)
+    consumable_id = br.read_method_6(class_3.const_69)  # 5 bits
+    
+    print(f"[PET FOOD] Using consumable {consumable_id}")
+    
+    char = session.current_char_dict
+    if not char:
+        print("[PET FOOD] ERROR: No character data")
+        return
+    
+    # Find the consumable definition
+    consumable_def = None
+    for c in CONSUMABLES:
+        if c.get("ConsumableID") == consumable_id:
+            consumable_def = c
+            break
+    
+    if not consumable_def or consumable_def.get("Type") != "PetFood":
+        print(f"[PET FOOD] ERROR: Invalid consumable ID {consumable_id} or not PetFood type")
+        return
+    
+    xp_amount = consumable_def.get("Magnitude", 0)
+    is_rare_pet_food = consumable_def.get("ConsumableName") == "RarePetFood"
+    
+    # Check if player has this consumable
+    consumables = char.get("consumables", [])
+    consumable_entry = None
+    for entry in consumables:
+        if entry.get("consumableID") == consumable_id:
+            consumable_entry = entry
+            break
+    
+    if not consumable_entry or consumable_entry.get("count", 0) <= 0:
+        print(f"[PET FOOD] ERROR: Player doesn't have consumable {consumable_id}")
+        return
+    
+    # Get the active pet from character data
+    # Try multiple sources: activePet, equippedPets, or first pet in pets list
+    active_pet_info = char.get("activePet", {})
+    pet_type_id = active_pet_info.get("typeID", 0)
+    pet_special_id = active_pet_info.get("special_id", 0)
+    
+    # If activePet is empty, try equippedPets (first equipped pet)
+    if pet_type_id == 0:
+        equipped_pets = char.get("equippedPets", [])
+        if equipped_pets and len(equipped_pets) > 0:
+            first_equipped = equipped_pets[0]
+            pet_type_id = first_equipped.get("typeID", 0)
+            pet_special_id = first_equipped.get("special_id", 0)
+    
+    # If still no pet found, try the first pet from pets list
+    if pet_type_id == 0:
+        pets = char.get("pets", [])
+        if pets and len(pets) > 0:
+            first_pet = pets[0]
+            pet_type_id = first_pet.get("typeID", 0)
+            pet_special_id = first_pet.get("special_id", 0)
+    
+    if pet_type_id == 0:
+        print("[PET FOOD] ERROR: No active pet found in any source")
+        return
+    
+    print(f"[PET FOOD] Applying to pet type={pet_type_id}, special={pet_special_id}")
+    
+    # Find the pet in the player's pets list
+    pets = char.get("pets", [])
+    target_pet = None
+    for pet in pets:
+        if pet.get("typeID") == pet_type_id and pet.get("special_id") == pet_special_id:
+            target_pet = pet
+            break
+    
+    if not target_pet:
+        print(f"[PET FOOD] ERROR: Pet not found type={pet_type_id}, special={pet_special_id}")
+        return
+    
+    # Get current XP and level
+    current_xp = target_pet.get("xp", 0)
+    current_level = target_pet.get("level", 1)
+    
+    # Add XP
+    new_xp = current_xp + xp_amount
+    
+    # Arcane Chew Bone (RarePetFood) also grants +1 level
+    # Savory Steak (PetFood) only grants XP, no level change
+    if is_rare_pet_food:
+        new_level = min(current_level + 1, 20)  # +1 level, max 20
+    else:
+        new_level = current_level  # Level stays the same
+    
+    # Update pet data
+    target_pet["xp"] = new_xp
+    target_pet["level"] = new_level
+    
+    # Also update activePet if this is the active pet
+    active_pet = char.get("activePet", {})
+    if active_pet.get("special_id") == pet_special_id:
+        active_pet["xp"] = new_xp
+        active_pet["level"] = new_level
+    
+    # Decrease consumable count
+    consumable_entry["count"] = consumable_entry.get("count", 1) - 1
+    new_count = consumable_entry["count"]
+    
+    # Save changes
+    save_characters(session.user_id, session.char_list)
+    
+    # Send consumable update to client
+    send_consumable_update(session.conn, consumable_id, new_count)
+    
+    # Send pet XP update to client
+    # IMPORTANT: Client ADDS the value to current XP (not sets it)
+    # So we send the XP gain amount (xp_amount), not the total (new_xp)
+    send_pet_xp_update(session, pet_type_id, pet_special_id, xp_amount, new_level, is_rare_pet_food)
+    
+    if is_rare_pet_food:
+        print(f"[PET FOOD] Success: Pet XP {current_xp} -> {new_xp}, Level {current_level} -> {new_level}")
+    else:
+        print(f"[PET FOOD] Success: Pet XP {current_xp} -> {new_xp}, Level stays at {current_level}")

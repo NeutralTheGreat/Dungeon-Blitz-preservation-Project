@@ -382,10 +382,22 @@ def handle_cancel_forge(session, data):
 
 
 def handle_use_forge_xp_consumable(session, data):
+    """
+    Handle consumable usage via 0x110 packet
+    This handles both ForgeXP (ID 5) and PetFood (ID 10, 11) consumables
+    """
     payload = data[4:]
     br = BitReader(payload)
     cid = br.read_method_20(class_3.const_69)
+    
+    # Check if this is a PetFood consumable (ID 10 or 11)
+    if cid in (10, 11):
+        # Import and call pet food handler
+        from pets import handle_use_pet_food
+        handle_use_pet_food(session, data)
+        return
 
+    # Original ForgeXP logic
     chars = getattr(session, "char_list", [])
     current_name = getattr(session, "current_character", None)
     char = next((c for c in chars if c.get("name") == current_name), None)
