@@ -1,12 +1,13 @@
 import json
 import os
 import struct
+import time
 
 from typing import Dict, Any
 from BitBuffer import BitBuffer
 from bitreader import BitReader
 from constants import Entity, class_7, class_20, class_3, Game, LinkUpdater, EntType, GearType, class_64, class_21, class_118, method_277
-from globals import GS
+from globals import GS, init_dungeon_run
 
 """
 Hints NPCs data 
@@ -100,10 +101,15 @@ def load_npc_data_for_level(level_name: str) -> list:
         with open(json_path, 'r') as file:
             data = json.load(file)
 
-        # Filter out hostile enemies (team 2) for tutorial levels
-        # The user wants to ensure no enemies are spawned by the server in these areas
-        if level_name in ("CraftTownTutorial", "TutorialDungeon", "TutorialBoat"):
+        # Filter out hostile enemies (team 2) for tutorial levels only
+        # Other dungeons use server-side AI (enabled in ai_logic.py)
+        CLIENT_AI_LEVELS = (
+            "TutorialDungeon", 
+            "TutorialBoat",
+        )
+        if level_name in CLIENT_AI_LEVELS:
             data = [npc for npc in data if npc.get("team") != 2]
+
 
         return data
     except (FileNotFoundError, json.JSONDecodeError) as e:
@@ -554,6 +560,15 @@ def ensure_level_npcs(level_name: str) -> None:
         return
 
     npcs = load_npc_data_for_level(level_name)
+    try:
+        from level_config import is_dungeon_level  # local import to avoid circulars
+    except Exception:
+        is_dungeon_level = lambda _: False
+
+    if is_dungeon_level(level_name):
+        total_enemies = sum(1 for npc in npcs if npc.get("team") == 2)
+        init_dungeon_run(level_name, total_enemies)
+
     level_map = GS.level_entities.setdefault(level_name, {})
 
     for npc_template in npcs:
@@ -561,6 +576,11 @@ def ensure_level_npcs(level_name: str) -> None:
 
         npc = dict(npc_template)
         npc["id"] = npc_id
+        # Seed position fields consistently
+        npc.setdefault("x", npc.get("pos_x", npc.get("x", 0.0)))
+        npc.setdefault("y", npc.get("pos_y", npc.get("y", 0.0)))
+        npc["pos_x"] = npc.get("x", 0.0)
+        npc["pos_y"] = npc.get("y", 0.0)
 
         level_map[npc_id] = {
             "id": npc_id,

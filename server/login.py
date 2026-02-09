@@ -13,7 +13,7 @@ from ai_logic import AI_ENABLED, ensure_ai_loop, run_ai_loop
 from bitreader import BitReader
 from constants import EntType, load_class_template
 from entity import Send_Entity_Data, ensure_level_npcs, normalize_entity_for_send
-from globals import SECRET, _level_add, all_sessions, GS, HOST, PORTS
+from globals import SECRET, _level_add, all_sessions, GS, HOST, PORTS, send_quest_progress
 from level_config import LEVEL_CONFIG, get_spawn_coordinates
 from socials import get_group_for_session, online_group_members, update_session_group_cache, build_group_update_packet
 
@@ -307,6 +307,14 @@ def handle_gameserver_login(session, data):
         print("Developer Client Detected skipping server spawned npcs ")
     else:
         ensure_level_npcs(session.current_level)
+        run = GS.dungeon_runs.get(session.current_level)
+        if run:
+            kills = len(run.get("killed_ids", []))
+            total = run.get("total", 0)
+            percent = min(100, int((kills * 100) / total)) if total else 0
+            session.current_char_dict["questTrackerState"] = percent
+            send_quest_progress(session, percent)
+
         level_map = GS.level_entities.get(session.current_level, {})
         npcs = [
             ent["props"]

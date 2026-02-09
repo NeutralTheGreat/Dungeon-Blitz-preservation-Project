@@ -1,10 +1,21 @@
 import struct
+import time
 
 from BitBuffer import BitBuffer
 from accounts import save_characters
 from bitreader import BitReader
 from constants import Entity, PowerType, GearType, class_64, class_1, EntType, class_21, Game
-from globals import send_consumable_update, build_change_offset_y_packet, GS, send_xp_reward
+from globals import (
+    send_consumable_update,
+    build_change_offset_y_packet,
+    GS,
+    send_xp_reward,
+    send_hp_update,
+    send_quest_progress,
+    record_dungeon_kill,
+    get_npc_props,
+    XP_CAP_PER_KILL,
+)
 from level_config import LEVEL_CONFIG
 
 
@@ -252,12 +263,12 @@ def handle_power_hit(session, data):
     target = None
     level = session.current_level
 
-    # Check session entities (players/pets)
+    # Check session entities (players/pets/NPC props pointer)
     if target_entity_id in session.entities:
         target = session.entities[target_entity_id]
-    # Check level NPCs (shared)
-    elif level in GS.level_npcs and target_entity_id in GS.level_npcs[level]:
-        target = GS.level_npcs[level][target_entity_id]
+    # Check level NPCs (shared) using canonical props
+    elif level:
+        target = get_npc_props(level, target_entity_id)
 
     if target:
         ent_name = target.get("name")
@@ -298,6 +309,15 @@ def handle_power_hit(session, data):
                 target["rewards_granted"] = True
                 target["hp"] = 0
                 
+                # Track dungeon kill progress
+                progress = record_dungeon_kill(level, target_entity_id)
+                if progress:
+                    for s in GS.all_sessions:
+                        if s.player_spawned and s.current_level == level:
+                            send_quest_progress(s, progress["percent"])
+                            if s.current_char_dict:
+                                s.current_char_dict["questTrackerState"] = progress["percent"]
+                
                 npc_level = target.get("level", 1)
                 
                 # Calculate player's find bonuses from equipped charm runes
@@ -308,6 +328,9 @@ def handle_power_hit(session, data):
                 base_gold = calculate_npc_gold(ent_name, npc_level)
                 gold_amount = get_modified_gold(base_gold, find_bonuses.get("gold_find", 0))
                 xp_amount = calculate_npc_exp(ent_name, npc_level)
+                if xp_amount > XP_CAP_PER_KILL:
+                    print(f"[Combat] XP capped for {ent_name}: {xp_amount} -> {XP_CAP_PER_KILL}")
+                    xp_amount = XP_CAP_PER_KILL
                 
                 # Send XP reward immediately
                 send_xp_reward(session, xp_amount)
@@ -372,10 +395,12 @@ def handle_power_hit(session, data):
                     should_drop_gear, gear_tier = False, 0
 
                 if random.random() < 0.9: 
+                    death_x = int(round(target.get("pos_x", target.get("x", 0))))
+                    death_y = int(round(target.get("pos_y", target.get("y", 0))))
                     process_drop_reward(
                         session, 
-                        target.get("x", 0), 
-                        target.get("y", 0), 
+                        death_x, 
+                        death_y, 
                         gold=gold_amount, 
                         hp_gain=hp_gain, 
                         drop_gear=should_drop_gear,
@@ -386,13 +411,51 @@ def handle_power_hit(session, data):
                     )
                 print(f"[Combat] Lethal on {ent_name} ({rank}, Realm={realm}). Dropping {gold_amount} Gold, {hp_gain} HP, XP={xp_amount}, Material={material_id}.")
 
+    # If the target is a player, we MUST send an authoritative HP update (0x3A) 
+    # because the client often ignores the HP loss in the 0x0A hit packet for itself.
+    target_player_session = None
+    if target.get("is_player", False):
+        # Find the session for this player entity
+        if target.get("id") == session.clientEntID:
+            target_player_session = session
+        else:
+            for s in GS.all_sessions:
+                if s.clientEntID == target.get("id"):
+                    target_player_session = s
+                    break
+    
+    if target_player_session:
+         # Send actual HP loss (negative delta)
+         # Note: damage_value is positive, so we send -damage_value
+         send_hp_update(target_player_session, target.get("id"), -damage_value)
+
+
+    # If the target is a player, we MUST send an authoritative HP update (0x3A) 
+    # because the client often ignores the HP loss in the 0x0A hit packet for itself.
+    target_player_session = None
+    if target.get("is_player", False):
+        # Find the session for this player entity
+        if target.get("id") == session.clientEntID:
+            target_player_session = session
+        else:
+            for s in GS.all_sessions:
+                if s.clientEntID == target.get("id"):
+                    target_player_session = s
+                    break
+    
+    if target_player_session:
+         # Send actual HP loss (negative delta)
+         # Note: damage_value is positive, so we send -damage_value
+         send_hp_update(target_player_session, target.get("id"), -damage_value)
 
     # Forward packet unchanged to other clients in same level
+    # If using Client-Side AI (player sends hit for enemy), we must echo it back to the player 
+    # if they are the target so they see the damage.
     for other in GS.all_sessions:
         if (
-                other is not session
-                and other.player_spawned
+                other.player_spawned
                 and other.current_level == session.current_level
+                and (other is not session or target_entity_id == session.clientEntID)
         ):
             other.conn.sendall(data)
 
@@ -450,6 +513,33 @@ def handle_add_buff(session, data):
             for _ in range(mod_value_count):
                 mod_value = br.read_method_560()
                 mod_values.append(mod_value)
+
+    # Track buff server-side for NPCs (team 2 only)
+    target_props = get_npc_props(session.current_level, entity_id)
+    if target_props and target_props.get("team") == 2:
+        buffs = target_props.setdefault("buffs", [])
+        expires_at = time.time() + duration
+        updated = False
+        for buff in buffs:
+            if buff.get("instance_id") == sequence_id:
+                buff.update({
+                    "buff_type_id": buff_type_id,
+                    "stack_count": stack_count,
+                    "expires_at": expires_at,
+                    "duration": duration,
+                    "caster_id": caster_id,
+                })
+                updated = True
+                break
+        if not updated:
+            buffs.append({
+                "buff_type_id": buff_type_id,
+                "instance_id": sequence_id,
+                "stack_count": stack_count,
+                "expires_at": expires_at,
+                "duration": duration,
+                "caster_id": caster_id,
+            })
 
     # Broadcast unchanged packet to other clients in same level
     for other in GS.all_sessions:
@@ -855,5 +945,3 @@ def handle_update_gearset(session, data):
         slots[i + 1] = gear_id
 
     save_characters(session.user_id, session.char_list)
-
-

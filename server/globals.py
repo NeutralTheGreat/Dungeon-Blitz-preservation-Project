@@ -24,6 +24,7 @@ class GlobalState:
         self.next_entity_id = 100000
         self.all_sessions = []
         self.house_visits = {} # token -> owner_char
+        self.dungeon_runs = {}  # level_name -> {"total": N, "killed_ids": set()}
 
 # a single shared instance:
 GS = GlobalState()
@@ -33,12 +34,54 @@ all_sessions = GS.all_sessions
 SECRET_HEX = "815bfb010cd7b1b4e6aa90abc7679028"
 SECRET      = bytes.fromhex(SECRET_HEX)
 
+XP_CAP_PER_KILL = 50000  # Maximum XP a single kill can grant
+
 def _level_add(level, session):
     s = GS.level_registry.setdefault(level, set())
     s.add(session)
 
 # Helpers
 #############################################
+
+def get_npc_props(level, entity_id):
+    """Look up NPC props dict from GS.level_entities by level name and entity ID."""
+    level_map = GS.level_entities.get(level, {})
+    entry = level_map.get(entity_id)
+    if entry and isinstance(entry, dict):
+        return entry.get("props", entry)
+    return None
+
+def send_quest_progress(session, percent):
+    """Send dungeon quest progress update (0xC8) to client.
+    percent: 0-100 integer representing kill progress.
+    """
+    bb = BitBuffer()
+    bb.write_method_4(int(percent))
+    payload = bb.to_bytes()
+    pkt = struct.pack(">HH", 0xC8, len(payload)) + payload
+    session.conn.sendall(pkt)
+
+def record_dungeon_kill(level, entity_id):
+    """Record an NPC kill in the dungeon run tracker.
+    Returns {"percent": int, "kills": int, "total": int} or None if not a tracked dungeon.
+    """
+    run = GS.dungeon_runs.get(level)
+    if not run:
+        return None
+    killed = run.setdefault("killed_ids", set())
+    killed.add(entity_id)
+    total = run.get("total", 0)
+    kills = len(killed)
+    percent = min(100, int((kills * 100) / total)) if total else 0
+    return {"percent": percent, "kills": kills, "total": total}
+
+def init_dungeon_run(level_name, total_enemies):
+    """Initialize a dungeon run tracker for kill progress."""
+    GS.dungeon_runs[level_name] = {
+        "total": total_enemies,
+        "killed_ids": set(),
+    }
+    print(f"[Dungeon] Initialized run for {level_name}: {total_enemies} total enemies")
 
 def send_chat_status(session, text: str):
     """
@@ -374,21 +417,42 @@ def send_charm_reward(session, charm_name):
     session.conn.sendall(pkt)
     print(f"[{session.addr}] Sent charm reward: {charm_name} (ID:{charm_id})")
 
-def send_dye_reward(session, dye_name, suppress=False):
+def send_dye_reward(session, dye_name_or_id, suppress=False, tier=0):
     """Send dye unlock packet (0x10a)
     
     Args:
         session: Player session
-        dye_name: The dye name to unlock (CamelCase format)
+        dye_name_or_id: The dye name (CamelCase format) or dye ID to unlock
         suppress: If False (default), show NEW notification. If True, suppress it.
+        tier: UNUSED - kept for API compatibility. Client uses dye's own rarity value.
+    
+    Client reads:
+        - dye_id: method_6(class_21.const_50) = 8 bits
+        - suppress: method_11() = 1 bit boolean
+    
+    Client determines notification color from dye's own rarity (var_8: L=legendary, R=rare, M=common)
     """
+    from constants import get_dye_id, class_21
+    
+    # Convert name to ID if needed
+    if isinstance(dye_name_or_id, str):
+        dye_id = get_dye_id(dye_name_or_id)
+        dye_name = dye_name_or_id
+    else:
+        dye_id = dye_name_or_id
+        dye_name = str(dye_id)
+    
+    if dye_id == 0:
+        print(f"[{session.addr}] Warning: Unknown dye '{dye_name_or_id}'")
+        return
+    
     bb = BitBuffer()
-    bb.write_method_13(dye_name)
-    bb.write_method_15(suppress)  # False = show notification, True = suppress
+    bb.write_method_6(dye_id, class_21.const_50)  # 8 bits for dye ID
+    bb.write_method_15(suppress)  # 1 bit: False = show notification, True = suppress
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x10a, len(payload)) + payload
     session.conn.sendall(pkt)
-    print(f"[{session.addr}] Sent dye reward: {dye_name}, suppress={suppress}")
+    print(f"[{session.addr}] Sent dye reward: {dye_name} (ID:{dye_id}), suppress={suppress}")
 
 def send_gold_loss(session, amount):
     """Send gold loss packet (0xb4)"""
@@ -497,21 +561,29 @@ def send_new_pet_packet(session, type_id, special_id, rank, suppress=False):
 
     print(f"[PET] Sent NEW PET : type={type_id}, special_id={special_id}, rank={rank}, suppress={suppress}")
 
-def send_pet_xp_update(session, type_id: int, special_id: int, new_xp: int, new_level: int, leveled_up: bool = False):
-    """
-    Send pet XP update packet (0xf2)
-    Client expects only a single 32-bit XP value
-    The client's method_1816 reads: param1.method_4() -> XP value
-    Then calls mEggPetInfo.method_1937(xp) to update the active pet's XP
+def send_pet_xp_update(session, pet_type_id, pet_special_id, xp_amount, new_level, is_rare_pet_food):
+    """Send pet XP update packet (0x38)
+    
+    Args:
+        session: Player session
+        pet_type_id: Pet type ID
+        pet_special_id: Pet special/instance ID
+        xp_amount: XP gained (client ADDS this to current XP)
+        new_level: The pet's new level after XP gain
+        is_rare_pet_food: Whether rare pet food was used (grants +1 level)
     """
     bb = BitBuffer()
-    bb.write_method_4(new_xp)  # Only XP value - client reads this with method_4()
+    bb.write_method_6(pet_type_id, class_7.const_19)   # pet type ID
+    bb.write_method_4(pet_special_id)                   # pet special/instance ID
+    bb.write_method_4(xp_amount)                        # XP gain amount
+    bb.write_method_6(new_level, class_7.const_75)      # new level
+    bb.write_method_15(is_rare_pet_food)                # rare pet food flag
 
     body = bb.to_bytes()
-    pkt = struct.pack(">HH", 0xF2, len(body)) + body
+    pkt = struct.pack(">HH", 0x38, len(body)) + body
     session.conn.sendall(pkt)
 
-    print(f"[PET] XP Update: type={type_id}, special={special_id}, xp={new_xp}, level={new_level}, leveled={leveled_up}")
+    print(f"[PET XP] Sent pet XP update: type={pet_type_id}, special={pet_special_id}, xp={xp_amount}, level={new_level}, rare={is_rare_pet_food}")
 
 def send_server_shutdown_warning(seconds):
     bb = BitBuffer()
