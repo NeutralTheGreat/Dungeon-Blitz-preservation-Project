@@ -107671,7 +107671,7 @@ Extracted XML 22:
 		<RewardItem>DyeLegendary</RewardItem>
 		<RewardType>Dye</RewardType>
 		<AlternateRewardpack>Lockbox01SafeRare</AlternateRewardpack>
-		<Rarity>R</Rarity>
+		<Rarity>L</Rarity>
 	</RewardpackType>
 	<RewardpackType RewardpackName="DyePack01Rare">
 		<RewardpackID>5</RewardpackID>

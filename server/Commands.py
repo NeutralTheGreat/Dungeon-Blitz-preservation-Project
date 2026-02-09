@@ -3,7 +3,7 @@ import random
 import time
 
 from bitreader import BitReader
-from constants import GearType, class_3, PowerType, Game, class_119, PET_TYPES
+from constants import GearType, class_3, PowerType, Game, class_119, PET_TYPES, get_egg_id
 from BitBuffer import BitBuffer
 from globals import build_start_skit_packet
 from missions import get_mission_extra
@@ -431,13 +431,13 @@ def handle_lockbox_reward(session, data):
     reward_map = {
         0: ("MountLockbox01L01", True, "mount"),  # Mount (Ivorstorm Guardian)
         1: ("Lockbox01L01", True, "pet"),  # Pet (Darkheart Apparition)
-        # 2: ("GenericBrown", True, "egg"),  # Egg
-        # 3: ("CommonBrown", True, "egg"),  # Egg
-        # 4: ("OrdinaryBrown", True, "egg"),  # Egg
-        # 5: ("PlainBrown", True, "egg"),  # Egg
+        2: ("GenericBrown", True, "egg"),  # Egg -> client shows "Pet (Level 10)"
+        3: ("CommonBrown", True, "egg"),  # Egg
+        4: ("OrdinaryBrown", True, "egg"),  # Egg
+        5: ("PlainBrown", True, "egg"),  # Egg
         6: ("RarePetFood", True, "consumable"),  # Consumable
         7: ("PetFood", True, "consumable"),  # Consumable
-        # 8: ("Lockbox01Gear", True, "gear"),  # Gear (will crash if invalid)
+        8: (None, True, "gear"),  # Class Gear - gear ID selected based on player class
         9: ("TripleFind", True, "charm"),  # Charm
         10: ("DoubleFind1", True, "charm"),  # Charm
         11: ("DoubleFind2", True, "charm"),  # Charm
@@ -450,46 +450,195 @@ def handle_lockbox_reward(session, data):
         18: ("750,000 Gold", True, "gold", 750000),  # Gold (750 000)
         19: (None, True, "dye"),  # Legendary Dye - actual dye name selected below
     }
-
-    idx, reward_data = random.choice(list(reward_map.items()))
     
-    # For dye rewards, select a random legendary dye
+    # Class gear mapping by player class
+    # Each class has 6 gear pieces: Sword, Shield, Hat, Armor, Gloves, Boots
+    CLASS_GEAR_IDS = {
+        "mage": [1165, 1166, 1167, 1168, 1169, 1170],
+        "rogue": [1171, 1172, 1173, 1174, 1175, 1176],
+        "paladin": [1177, 1178, 1179, 1180, 1181, 1182],
+    }
+    
+    # Class gear names for client display
+    CLASS_GEAR_NAMES = {
+        1165: "UniqueMageLockbox01GearSword30",
+        1166: "UniqueMageLockbox01GearShield30",
+        1167: "UniqueMageLockbox01GearHat30",
+        1168: "UniqueMageLockbox01GearArmor30",
+        1169: "UniqueMageLockbox01GearGloves30",
+        1170: "UniqueMageLockbox01GearBoots30",
+        1171: "UniqueRogueLockbox01GearSword30",
+        1172: "UniqueRogueLockbox01GearShield30",
+        1173: "UniqueRogueLockbox01GearHat30",
+        1174: "UniqueRogueLockbox01GearArmor30",
+        1175: "UniqueRogueLockbox01GearGloves30",
+        1176: "UniqueRogueLockbox01GearBoots30",
+        1177: "UniquePaladinLockbox01GearSword30",
+        1178: "UniquePaladinLockbox01GearShield30",
+        1179: "UniquePaladinLockbox01GearHat30",
+        1180: "UniquePaladinLockbox01GearArmor30",
+        1181: "UniquePaladinLockbox01GearGloves30",
+        1182: "UniquePaladinLockbox01GearBoots30",
+    }
+
+    # Get player class for gear selection
+    char = session.current_char_dict
+    if not char:
+        return
+    
+    player_class = char.get("class", "").lower()
+    
+    # ===== DUPLICATE PREVENTION FOR LEGENDARY ITEMS =====
+    # Get what the player already owns
+    owned_mounts = set(char.get("mounts", []))
+    owned_dyes = set(char.get("OwnedDyes", []))
+    owned_gear_ids = set(g.get("gearID", 0) for g in char.get("inventoryGears", []))
+    owned_gear_ids.update(g.get("gearID", 0) for g in char.get("equippedGears", []))
+    owned_pet_types = set(p.get("typeID", 0) for p in char.get("pets", []))
+    
+    # Import mount/pet/dye IDs for checking ownership
+    from constants import get_mount_id, get_dye_id
+    
+    # Check which legendary rewards are still available
+    available_rewards = {}
+    
+    for idx, reward_data in reward_map.items():
+        reward_type = reward_data[2]
+        
+        if reward_type == "mount":
+            mount_id = get_mount_id(reward_data[0])
+            if mount_id == 0 or mount_id not in owned_mounts:
+                available_rewards[idx] = reward_data
+                
+        elif reward_type == "pet":
+            # Check if player already owns this pet type
+            pet_def = next((p for p in PET_TYPES if p.get("PetName") == reward_data[0] or p.get("PetID") == reward_data[0]), None)
+            if pet_def:
+                pet_type_id = pet_def.get("PetID", 0)
+                if pet_type_id not in owned_pet_types:
+                    available_rewards[idx] = reward_data
+            else:
+                available_rewards[idx] = reward_data  # Unknown pet, allow it
+                
+        elif reward_type == "dye":
+            # Dye is selected later, so we check if ANY legendary dye is available
+            available_dyes = []
+            for dye_name in LEGENDARY_DYES:
+                dye_id = get_dye_id(dye_name)
+                if dye_id == 0 or dye_id not in owned_dyes:
+                    available_dyes.append(dye_name)
+            if available_dyes:
+                available_rewards[idx] = reward_data
+                
+        elif reward_type == "gear":
+            # Check if any class gear is still available
+            class_gears = CLASS_GEAR_IDS.get(player_class, CLASS_GEAR_IDS["paladin"])
+            available_gears = [g for g in class_gears if g not in owned_gear_ids]
+            if available_gears:
+                available_rewards[idx] = reward_data
+
+        elif reward_type == "egg":
+            # Egg reward - adds Level 10 pet directly to inventory
+            # No capacity limit for pet inventory (pets are unlimited)
+            available_rewards[idx] = reward_data
+                
+        else:
+            # Gold, consumables, charms - always available (not unique)
+            available_rewards[idx] = reward_data
+    
+    # If no legendary rewards available, fall back to non-legendary rewards only
+    if not available_rewards:
+        print("[Lockbox] All legendary items owned! Falling back to non-legendary rewards.")
+        available_rewards = {k: v for k, v in reward_map.items() if v[2] in ("gold", "consumable", "charm", "egg")}
+    
+    if not available_rewards:
+        print("[Lockbox] ERROR: No rewards available at all!")
+        return
+    
+    idx, reward_data = random.choice(list(available_rewards.items()))
+    
+    # For dye rewards, select a random legendary dye THE PLAYER DOESN'T OWN
     if reward_data[2] == "dye":
-        selected_dye = random.choice(LEGENDARY_DYES)
-        reward_data = (selected_dye, True, "dye")
+        available_dyes = []
+        for dye_name in LEGENDARY_DYES:
+            dye_id = get_dye_id(dye_name)
+            if dye_id == 0 or dye_id not in owned_dyes:
+                available_dyes.append(dye_name)
+        if available_dyes:
+            selected_dye = random.choice(available_dyes)
+            reward_data = (selected_dye, True, "dye")
+        else:
+            # Fallback: give gold instead
+            reward_data = ("750,000 Gold", True, "gold", 750000)
+            idx = 18
+    
+    # For gear rewards, select a random class gear THE PLAYER DOESN'T OWN
+    gear_id = 0
+    if reward_data[2] == "gear":
+        class_gears = CLASS_GEAR_IDS.get(player_class, CLASS_GEAR_IDS["paladin"])
+        available_gears = [g for g in class_gears if g not in owned_gear_ids]
+        if available_gears:
+            gear_id = random.choice(available_gears)
+            gear_name = CLASS_GEAR_NAMES.get(gear_id, f"ClassGear{gear_id}")
+            reward_data = (gear_name, True, "gear", gear_id)
+        else:
+            # Fallback: give gold instead
+            reward_data = ("750,000 Gold", True, "gold", 750000)
+            idx = 18
         
     name = reward_data[0]
     needs_str = reward_data[1]
     reward_type = reward_data[2]
-    gold_amount = reward_data[3] if len(reward_data) > 3 else 0
+    gold_amount = reward_data[3] if len(reward_data) > 3 and reward_type == "gold" else 0
+    reward_gear_id = reward_data[3] if len(reward_data) > 3 and reward_type == "gear" else 0
     
+    # For dye rewards, do NOT convert to display name here
+    # Client needs CamelCase name (e.g. "BroodMotherBlack") for icon lookup in class_18.method_996
+    # Converting to "Brood Mother Black" causes Error #1009 (Null Object Reference)
+    # The client handles display name conversion internally using the Dye Object
+    # if reward_type == "dye":
+    #    from constants import get_dye_display_name
+    #    name = get_dye_display_name(name)
+    
+    # For egg rewards: client looks up class_14.var_233[param4] which is keyed by PetName, not EggName.
+    # Sending "PlainBrown" etc. causes null lookup and Error #1009. Send the hatched pet's PetName
+    # (EggID matches PetID in data) so the client can show the correct icon. Keep 'name' as egg name for grant.
+    name_for_packet = name
+    if reward_type == "egg":
+        egg_id = get_egg_id(name)
+        pet_for_display = next((p for p in PET_TYPES if p.get("PetID") == egg_id), None)
+        if pet_for_display:
+            name_for_packet = pet_for_display.get("PetName", name)
+
     # Send visual packet to client
     bb = BitBuffer()
     
-    # For dye rewards, use DyePack01Legendary (pack ID 4, idx 0) which has RewardType=Dye
-    # This ensures the client renders the actual dye color icon instead of generic "Top Tier Dyes"
+    # For dye rewards, send the specific dye from the Dye Pack (Pack ID 4)
+    # This allows the client to show the specific dye icon and name.
+    # Lockbox legendary dye text colour: client uses Rewardpack Rarity from Game.swz.
+    # DyePack01Legendary (pack 4) must have <Rarity>L</Rarity> for yellow text; see
+    # extra-modules/swz-scripts/Game.swz.txt (repack into Game.swz if serving custom client).
     if reward_type == "dye":
-        bb.write_method_6(4, CAT_BITS)  # DyePack01Legendary = pack ID 4
-        bb.write_method_6(0, ID_BITS)   # First entry in the pack
+        # Pack 4 (Dye Pack) contains a single generic dye item at index 0.
+        # We must use index 0. The specific dye is determined by the name string we send.
+        bb.write_method_6(4, CAT_BITS)        # Pack ID 4 = Dye Pack
+        bb.write_method_6(0, ID_BITS)         # Index 0 (The only item in this pack)
     else:
         bb.write_method_6(PACK_ID, CAT_BITS)
         bb.write_method_6(idx, ID_BITS)
+
     
     bb.write_method_6(1 if needs_str else 0, 1)
     if needs_str:
-        bb.write_method_13(name)
+        bb.write_method_13(name_for_packet)
 
     payload = bb.to_bytes()
     packet = struct.pack(">HH", 0x108, len(payload)) + payload
     session.conn.sendall(packet)
 
     print(f"Lockbox reward: idx={idx}, name={name}, type={reward_type}")
+
     
-    # Actually grant the reward to the player
-    char = session.current_char_dict
-    if not char:
-        return
-        
     save_needed = False
     
     
@@ -602,6 +751,38 @@ def handle_lockbox_reward(session, data):
         else:
             print(f"[Lockbox] Warning: Pet definition not found for '{name}'")
 
+    elif reward_type == "egg":
+        # Egg reward - Add as Level 10 pet directly to inventory
+        # (EggID matches PetID in data, so egg_id is the pet type ID)
+        egg_id = get_egg_id(name)
+        if egg_id and egg_id > 0:
+            pet_def = next((p for p in PET_TYPES if p.get("PetID") == egg_id), None)
+            if pet_def:
+                pet_type_id = pet_def["PetID"]
+                starting_level = 10  # Level 10 from egg reward
+                
+                pets = char.get("pets", [])
+                special_id = max((p.get("special_id", 0) for p in pets), default=0) + 1
+                
+                new_pet = {
+                    "typeID": pet_type_id,
+                    "special_id": special_id,
+                    "level": starting_level,
+                    "xp": 0,
+                }
+                
+                pets.append(new_pet)
+                char["pets"] = pets
+                
+                # Send pet notification
+                send_new_pet_packet(session, pet_type_id, special_id, starting_level, suppress=False)
+                save_needed = True
+                print(f"[Lockbox] {char['name']} received level {starting_level} pet {pet_def.get('DisplayName', name)}")
+            else:
+                print(f"[Lockbox] Warning: Pet definition not found for egg ID {egg_id}")
+        else:
+            print(f"[Lockbox] Warning: Unknown egg '{name}'")
+
     elif reward_type == "dye":
         # Add dye to OwnedDyes using integer ID (not string name)
         from globals import send_dye_reward
@@ -614,11 +795,29 @@ def handle_lockbox_reward(session, data):
             owned_dyes = char.setdefault("OwnedDyes", [])
             if dye_id not in owned_dyes:
                 owned_dyes.append(dye_id)
-                send_dye_reward(session, name, suppress=False)  # Show NEW notification
+                send_dye_reward(session, name, suppress=False)  # Show NEW notification - client uses dye's rarity
                 save_needed = True
                 print(f"[Lockbox] {char['name']} received dye {name} (ID: {dye_id})")
             else:
                 print(f"[Lockbox] {char['name']} already owns dye {name} (ID: {dye_id})")
+    
+    elif reward_type == "gear":
+        # Add class gear to inventory (Tier 2 = Legendary)
+        if reward_gear_id > 0:
+            new_gear = {
+                "gearID": reward_gear_id,
+                "tier": 2,  # Tier 2 = Legendary (gold/yellow notification)
+                "runes": [0, 0, 0],
+                "colors": [0, 0]
+            }
+            
+            inventory = char.setdefault("inventoryGears", [])
+            inventory.append(new_gear)
+            
+            # Send gear reward notification with tier 2 for legendary color
+            send_gear_reward(session, reward_gear_id, tier=2)
+            save_needed = True
+            print(f"[Lockbox] {char['name']} received legendary class gear {name} (ID: {reward_gear_id}, Tier: 2)")
     
     if save_needed:
         save_characters(session.user_id, session.char_list)

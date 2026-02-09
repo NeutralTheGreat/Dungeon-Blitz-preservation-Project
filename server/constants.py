@@ -357,6 +357,20 @@ def get_dye_id(dye_name: str) -> int:
             return int(dye_id)
     return 0
 
+def get_dye_display_name(dye_name: str) -> str:
+    """Get the display name (with spaces) from a CamelCase dye name.
+    
+    Example: 'DragonCoatRed' -> 'Dragon Coat Red'
+    Returns the original name if not found in database.
+    """
+    normalized_input = dye_name.replace(" ", "").lower()
+    
+    for dye_id, dye_info in DYE_DATA.items():
+        stored_name = dye_info.get("name", "").replace(" ", "").lower()
+        if stored_name == normalized_input:
+            return dye_info.get("name", dye_name)
+    return dye_name
+
 def get_ability_info(ability_id: int, rank: int):
     key, rank = str(ability_id), str(rank)
     for e in ABILITY_DATA:
@@ -376,6 +390,14 @@ MATERIALS_DATA = {
 
 def get_mount_id(name: str) -> int:
     return MOUNT_IDS.get(name, 0)
+
+
+def get_egg_id(egg_name: str) -> int:
+    """Get egg ID from egg name (e.g. GenericBrown, CommonBrown)."""
+    for e in EGG_TYPES:
+        if e.get("EggName") == egg_name:
+            return int(e.get("EggID", 0))
+    return 0
 
 
 def get_charm_id(charm_name: str) -> int:

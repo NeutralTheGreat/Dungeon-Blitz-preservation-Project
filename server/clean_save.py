@@ -98,5 +98,5 @@ def clean_save(filepath):
     print("\n=== Cleanup complete! ===")
 
 if __name__ == "__main__":
-    save_path = os.path.join(os.path.dirname(__file__), "saves", "2.json")
+    save_path = os.path.join(os.path.dirname(__file__), "saves", "1.json")
     clean_save(save_path)

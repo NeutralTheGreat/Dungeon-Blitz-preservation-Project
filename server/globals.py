@@ -374,21 +374,42 @@ def send_charm_reward(session, charm_name):
     session.conn.sendall(pkt)
     print(f"[{session.addr}] Sent charm reward: {charm_name} (ID:{charm_id})")
 
-def send_dye_reward(session, dye_name, suppress=False):
+def send_dye_reward(session, dye_name_or_id, suppress=False, tier=0):
     """Send dye unlock packet (0x10a)
     
     Args:
         session: Player session
-        dye_name: The dye name to unlock (CamelCase format)
+        dye_name_or_id: The dye name (CamelCase format) or dye ID to unlock
         suppress: If False (default), show NEW notification. If True, suppress it.
+        tier: UNUSED - kept for API compatibility. Client uses dye's own rarity value.
+    
+    Client reads:
+        - dye_id: method_6(class_21.const_50) = 8 bits
+        - suppress: method_11() = 1 bit boolean
+    
+    Client determines notification color from dye's own rarity (var_8: L=legendary, R=rare, M=common)
     """
+    from constants import get_dye_id, class_21
+    
+    # Convert name to ID if needed
+    if isinstance(dye_name_or_id, str):
+        dye_id = get_dye_id(dye_name_or_id)
+        dye_name = dye_name_or_id
+    else:
+        dye_id = dye_name_or_id
+        dye_name = str(dye_id)
+    
+    if dye_id == 0:
+        print(f"[{session.addr}] Warning: Unknown dye '{dye_name_or_id}'")
+        return
+    
     bb = BitBuffer()
-    bb.write_method_13(dye_name)
-    bb.write_method_15(suppress)  # False = show notification, True = suppress
+    bb.write_method_6(dye_id, class_21.const_50)  # 8 bits for dye ID
+    bb.write_method_15(suppress)  # 1 bit: False = show notification, True = suppress
     payload = bb.to_bytes()
     pkt = struct.pack(">HH", 0x10a, len(payload)) + payload
     session.conn.sendall(pkt)
-    print(f"[{session.addr}] Sent dye reward: {dye_name}, suppress={suppress}")
+    print(f"[{session.addr}] Sent dye reward: {dye_name} (ID:{dye_id}), suppress={suppress}")
 
 def send_gold_loss(session, amount):
     """Send gold loss packet (0xb4)"""

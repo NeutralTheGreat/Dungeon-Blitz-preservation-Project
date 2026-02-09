@@ -59,12 +59,14 @@ def Player_Data_Packet(char: dict,
 
     # ──────────────(Gear Slots)──────────────
     gear_list = char.get("equippedGears", [])
-    for gear in gear_list:
-        gear_id = gear.get("gearID", 0)
-        rune1, rune2, rune3 = gear.get("runes", [0, 0, 0])
-        color1, color2 = gear.get("colors", [0, 0])
-
+    # Ensure we always write exactly 6 gear slots
+    for slot_idx in range(6):
+        gear = gear_list[slot_idx] if slot_idx < len(gear_list) else {}
+        gear_id = gear.get("gearID", 0) if isinstance(gear, dict) else 0
+        
         if gear_id:
+            rune1, rune2, rune3 = gear.get("runes", [0, 0, 0])
+            color1, color2 = gear.get("colors", [0, 0])
             buf.write_method_11(1, 1)  # presence bit
             buf.write_method_11(gear_id, 11)
             buf.write_method_11(0, 2)
