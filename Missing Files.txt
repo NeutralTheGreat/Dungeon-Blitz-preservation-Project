@@ -1,6 +1,4 @@
 - TalesNR.swf
-- LevelsLD.swf
-- LevelsCH.swf
 - TalesSD.swf
 
 Here are the main game URLs for reference:
@@ -8,45 +6,6 @@ Game Website: http://www.dungeonblitz.com/
 Facebook App URL: http://apps.facebook.com/dungeonblitz/
 Kongregate Game Page: http://www.kongregate.com/games/BlueMammoth/dungeon-blitz
 Static/CDN Domain: http://db.bmgstatic.com/p/
-
-LevelsCH.swf
-"255--------CEMETERY HILL------------"
-var_5["26CemeteryHill"] = "LevelsCH.swf/a_Level_CemeteryHill 11 11 false";
-var_5["26CemeteryHillHard"] = "LevelsCH.swf/a_Level_CemeteryHill 26 11 false Hard";
-var_5["27CH_Mission1"] = "LevelsCH.swf/a_Level_CHMission1 11 11 true";
-var_5["27CH_Mission1Hard"] = "LevelsCH.swf/a_Level_CHMission1 26 11 true Hard";
-var_5["28CH_Mission2"] = "LevelsCH.swf/a_Level_CHMission2 11 11 true";
-var_5["28CH_Mission2Hard"] = "LevelsCH.swf/a_Level_CHMission2 26 11 true Hard";
-var_5["29CH_Mission3"] = "LevelsCH.swf/a_Level_CHMission3 13 13 true";
-var_5["29CH_Mission3Hard"] = "LevelsCH.swf/a_Level_CHMission3 28 13 true Hard";
-var_5["30CH_Mission4"] = "LevelsCH.swf/a_Level_CHMission4 12 12 true";
-var_5["30CH_Mission4Hard"] = "LevelsCH.swf/a_Level_CHMission4 27 12 true Hard";
-var_5["31CH_Mission5"] = "LevelsCH.swf/a_Level_CHMission5 12 12 true";
-var_5["31CH_Mission5Hard"] = "LevelsCH.swf/a_Level_CHMission5 27 12 true Hard";
-var_5["32CH_Mission6"] = "LevelsCH.swf/a_Level_CHMission6 14 14 true";
-var_5["32CH_Mission6Hard"] = "LevelsCH.swf/a_Level_CHMission6 29 14 true Hard";
-var_5["33CH_Mission7"] = "LevelsCH.swf/a_Level_CHMission7 15 15 true";
-var_5["33CH_Mission7Hard"] = "LevelsCH.swf/a_Level_CHMission7 30 15 true Hard";
-var_5["34CH_Mission8"] = "LevelsCH.swf/a_Level_CHMission8 15 15 true";
-var_5["34CH_Mission8Hard"] = "LevelsCH.swf/a_Level_CHMission8 30 15 true Hard";
-var_5["35CH_MiniMission1"] = "LevelsCH.swf/a_Level_CHMini1 11 11 true";
-var_5["35CH_MiniMission1Hard"] = "LevelsCH.swf/a_Level_CHMini1 26 11 true Hard";
-var_5["36CH_MiniMission2"] = "LevelsCH.swf/a_Level_CHMini2 11 11 true";
-var_5["36CH_MiniMission2Hard"] = "LevelsCH.swf/a_Level_CHMini2 26 11 true Hard";
-var_5["37CH_MiniMission3"] = "LevelsCH.swf/a_Level_CHMini3 12 12 true";
-var_5["37CH_MiniMission3Hard"] = "LevelsCH.swf/a_Level_CHMini3 27 12 true Hard";
-var_5["38CH_MiniMission4"] = "LevelsCH.swf/a_Level_CHMini4 12 12 true";
-var_5["38CH_MiniMission4Hard"] = "LevelsCH.swf/a_Level_CHMini4 27 12 true Hard";
-var_5["39CH_MiniMission5"] = "LevelsCH.swf/a_Level_CHMini5 13 13 true";
-var_5["39CH_MiniMission5Hard"] = "LevelsCH.swf/a_Level_CHMini5 28 13 true Hard";
-var_5["40CH_MiniMission6"] = "LevelsCH.swf/a_Level_CHMini6 13 13 true";
-var_5["40CH_MiniMission6Hard"] = "LevelsCH.swf/a_Level_CHMini6 28 13 true Hard";
-var_5["41CH_MiniMission7"] = "LevelsCH.swf/a_Level_CHMini7 14 14 true";
-var_5["41CH_MiniMission7Hard"] = "LevelsCH.swf/a_Level_CHMini7 29 14 true Hard";
-var_5["42CH_MiniMission8"] = "LevelsCH.swf/a_Level_CHMini8 14 14 true";
-var_5["42CH_MiniMission8Hard"] = "LevelsCH.swf/a_Level_CHMini8 29 14 true Hard";
-var_5["430CH_MiniMission9"] = "LevelsCH.swf/a_Level_CHMini9 15 15 true";
-var_5["430CH_MiniMission9Hard"] = "LevelsCH.swf/a_Level_CHMini9 30 15 true Hard";
 
 TalesNR.swf
 "055--------WOLFS END------------"
@@ -56,10 +15,6 @@ var_5["103NR_Tales3Bazaar"] = "TalesNR.swf/a_Level_NRTales3Bazaar 44 29 true";
 var_5["104NR_Tales4Research"] = "TalesNR.swf/a_Level_NRTales4Research 44 29 true";
 var_5["105NR_Tales5DreamCave"] = "TalesNR.swf/a_Level_NRTales5DreamCave 44 29 true";
 
-LevelsLD.swf
-"205--------FELBRIDGE------------"
-var_5["251LDArena1"] = "LevelsLD.swf/a_Level_LDArena1 50 50 true";
-
 TalesSD.swf
 "687--------SHAZARI DESERT------------"
 var_5["751SD_Tales1Escort"] = "TalesSD.swf/a_Level_SDTales1Escort 44 29 true";
@@ -68,8 +23,3 @@ var_5["753SD_Tales3Remodel"] = "TalesSD.swf/a_Level_SDTales3Remodel 44 29 true";
 var_5["754SD_Tales4Oasis"] = "TalesSD.swf/a_Level_SDTales4Oasis 44 29 true";
 var_5["755SD_Tales5Defense"] = "TalesSD.swf/a_Level_SDTales5Defense 44 29 true";
 var_5["756SD_Tales6Time"] = "TalesSD.swf/a_Level_SDTales6Time 44 29 true";
-
-
-
-
-
